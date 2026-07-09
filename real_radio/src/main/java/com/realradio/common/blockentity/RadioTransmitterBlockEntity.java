@@ -2,7 +2,9 @@ package com.realradio.common.blockentity;
 
 import com.realradio.common.menu.RadioTransmitterMenu;
 import com.realradio.common.registry.ModBlockEntities;
+import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
+import com.realradio.common.util.RadioPropagation;
 import com.realradio.config.RealRadioConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -26,21 +28,23 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Captures voice of players within {@link #CAPTURE_RADIUS} blocks and broadcasts
  * on the configured frequency / band.
- * <p>
- * Broadcast range is derived from frequency (lower → farther; AM ≫ FM), not set by the player.
  */
 public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProvider {
     public static final int CAPTURE_RADIUS = 4;
+    private static final long SPEAK_HOLD_MS = 350L;
 
     private static final int DATA_FREQUENCY_BITS = 0;
     private static final int DATA_IS_AM = 1;
-    private static final int DATA_RANGE = 2; // computed range for GUI sync
+    private static final int DATA_RANGE = 2;
     private static final int DATA_ACTIVE = 3;
-    private static final int DATA_COUNT = 4;
+    private static final int DATA_SPEAKING = 4;
+    private static final int DATA_COUNT = 5;
 
     private float frequency = RadioBand.FM.defaultFrequency();
     private boolean isAM;
     private boolean active;
+    private long lastSpeakMs;
+    private final ChannelPresets presets = new ChannelPresets();
 
     private final ContainerData dataAccess = new ContainerData() {
         @Override
@@ -50,6 +54,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
                 case DATA_IS_AM -> isAM ? 1 : 0;
                 case DATA_RANGE -> getRange();
                 case DATA_ACTIVE -> active ? 1 : 0;
+                case DATA_SPEAKING -> isSpeakingNow() ? 1 : 0;
                 default -> 0;
             };
         }
@@ -60,9 +65,10 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
                 case DATA_FREQUENCY_BITS -> frequency = Float.intBitsToFloat(value);
                 case DATA_IS_AM -> isAM = value != 0;
                 case DATA_RANGE -> {
-                    // Range is frequency-derived; ignore client writes
                 }
                 case DATA_ACTIVE -> active = value != 0;
+                case DATA_SPEAKING -> {
+                }
                 default -> {
                 }
             }
@@ -79,7 +85,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RadioTransmitterBlockEntity be) {
-        // Registration is kept in sync via setLevel / onLoad / onRemoved
+        // Registration is kept in sync via onLoad / onRemoved
     }
 
     @Override
@@ -116,8 +122,16 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     }
 
     public AABB captureBox() {
-        BlockPos pos = getBlockPos();
-        return new AABB(pos).inflate(CAPTURE_RADIUS);
+        return new AABB(getBlockPos()).inflate(CAPTURE_RADIUS);
+    }
+
+    /** Called when a player voice frame is relayed through this TX. */
+    public void markSpeaking() {
+        lastSpeakMs = System.currentTimeMillis();
+    }
+
+    public boolean isSpeakingNow() {
+        return active && lastSpeakMs > 0 && System.currentTimeMillis() - lastSpeakMs < SPEAK_HOLD_MS;
     }
 
     public float getFrequency() {
@@ -125,8 +139,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     }
 
     public void setFrequency(float frequency) {
-        RadioBand band = getBand();
-        this.frequency = band.snap(frequency);
+        this.frequency = getBand().snap(frequency);
         setChangedAndSync();
     }
 
@@ -148,19 +161,15 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     }
 
     /**
-     * Effective broadcast range in blocks — computed from band + frequency.
-     * Lower frequencies travel farther; AM covers more ground than FM.
-     * AM gains extra reach at night ({@link RealRadioConfig#amNightMultiplier()}).
+     * Effective broadcast range: band × frequency × night (AM) × antenna height.
      */
     public int getRange() {
         int base = getBand().rangeBlocks(frequency);
+        float mult = RadioPropagation.antennaRangeMultiplier(getBlockPos().getY());
         if (isAM && level != null && level.isNight()) {
-            float mult = RealRadioConfig.amNightMultiplier();
-            if (mult > 1.0f) {
-                return Math.max(1, Math.round(base * mult));
-            }
+            mult *= RealRadioConfig.amNightMultiplier();
         }
-        return base;
+        return Math.max(1, Math.round(base * mult));
     }
 
     public boolean isActive() {
@@ -169,6 +178,24 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
 
     public void setActive(boolean active) {
         this.active = active;
+        setChangedAndSync();
+    }
+
+    public ChannelPresets getPresets() {
+        return presets;
+    }
+
+    public void savePreset(int slot) {
+        presets.save(slot, frequency, isAM);
+        setChangedAndSync();
+    }
+
+    public void loadPreset(int slot) {
+        if (!presets.isSet(slot)) {
+            return;
+        }
+        this.isAM = presets.isAM(slot);
+        this.frequency = getBand().snap(presets.getFrequency(slot));
         setChangedAndSync();
     }
 
@@ -197,7 +224,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         tag.putFloat("frequency", frequency);
         tag.putBoolean("isAM", isAM);
         tag.putBoolean("active", active);
-        // Legacy "range" no longer stored — range is derived from frequency
+        presets.saveToNbt(tag);
     }
 
     @Override
@@ -206,7 +233,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         isAM = tag.getBoolean("isAM");
         frequency = getBand().snap(tag.contains("frequency") ? tag.getFloat("frequency") : getBand().defaultFrequency());
         active = tag.getBoolean("active");
-        // Ignore legacy "range" NBT if present
+        presets.loadFromNbt(tag);
     }
 
     @Override

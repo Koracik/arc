@@ -18,13 +18,10 @@
   - FM: 87.5–108.0 MHz, шаг 0.1, дальность ≈ base…base×1.5 (авто, ниже частота — дальше)
   - AM: 530–1600 kHz, шаг 10, дальность ≈ base×2…base×3 (авто), линейный спад
 - Дальность **не выбирается игроком** — зависит от частоты; базовое значение в конфиге
-- Конфиг: `config/real_radio-common.toml`
-  - `baseRangeBlocks` (по умолчанию **2500**)
-  - `amNightMultiplier` (AM ночью дальше)
-  - `squelchThreshold`, `staticVolumeScale`
-- Неточная настройка: голос тише; соседние станции создают помехи; FM capture
-- Белый шум тихий; squelch глушит пустой эфир
-- GUI: LCD-дисплей, ± тонкая настройка, S-метр, ON AIR / В ЭФИРЕ
+- Конфиг: `config/real_radio-common.toml` (дальность, night, LOS, погода, AGC, squelch)
+- План / roadmap: [`real_radio/ROADMAP.md`](real_radio/ROADMAP.md)
+- Реализм: LOS (FM), высота антенны, дождь/гроза, помехи, FM capture, AGC, пресеты
+- GUI: дерево, LCD, спектр-пики, M1–M3, S-метр, mic, ON AIR
 - Блоки **без** FE/RF — работают автономно
 
 ### Требования

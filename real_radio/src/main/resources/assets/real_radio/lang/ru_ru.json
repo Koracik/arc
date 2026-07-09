@@ -7,7 +7,7 @@
   "gui.real_radio.frequency": "Частота",
   "gui.real_radio.range": "Дальность: %s блоков",
   "gui.real_radio.range_auto": "Дальность: %s бл. (авто)",
-  "gui.real_radio.range_hint": "Ниже частота — дальше сигнал",
+  "gui.real_radio.range_hint": "Ниже частота / выше блок — дальше",
   "gui.real_radio.volume": "Громкость: %s%%",
   "gui.real_radio.band_am": "AM",
   "gui.real_radio.band_fm": "FM",
@@ -21,6 +21,10 @@
   "gui.real_radio.signal_good": "Хороший",
   "gui.real_radio.signal_excellent": "Отличный",
   "gui.real_radio.on_air": "В ЭФИРЕ",
+  "gui.real_radio.mic": "Микрофон",
+  "gui.real_radio.preset": "M%s",
+  "gui.real_radio.preset_hint": "ЛКМ: загрузить · ПКМ: сохранить",
+  "gui.real_radio.spectrum_hint": "Пики = соседние станции",
   "real_radio.line.radio": "Радио",
   "subtitles.real_radio.radio_static": "Шипение радио"
 }

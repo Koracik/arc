@@ -136,7 +136,12 @@ public final class SignalQuality {
         if (isSquelched(finalQuality)) {
             return 0.0f;
         }
-        return finalQuality * receiverVolume;
+        float q = finalQuality;
+        if (RealRadioConfig.enableAgc() && q > 0.0f) {
+            // Soft AGC: exponent < 1 lifts weak-but-open signals, full stays ~1
+            q = (float) Math.pow(q, RealRadioConfig.agcExponent());
+        }
+        return clamp01(q) * receiverVolume;
     }
 
     public static boolean isSquelched(float finalQuality) {

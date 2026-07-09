@@ -133,6 +133,7 @@ public final class RealRadioServerAddon implements AddonInitializer {
                 continue;
             }
 
+            tx.markSpeaking();
             relayFromTransmitter(tx, data, sequence, distance);
         }
     }

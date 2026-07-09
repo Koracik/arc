@@ -9,7 +9,10 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Vintage radio-style widgets: dial slider, LCD, S-meter, compact toggles.
@@ -110,6 +113,27 @@ public final class RadioWidgets {
         }
     }
 
+    /** Pulsing mic / activity meter for the transmitter. */
+    public static void drawMicMeter(GuiGraphics graphics, Font font, int x, int y, int w, boolean speaking, boolean powered) {
+        graphics.drawString(font, Component.translatable("gui.real_radio.mic").getString(), x, y, COL_AMBER_DIM, false);
+        int barY = y + 11;
+        int barH = 8;
+        graphics.fill(x, barY, x + w, barY + barH, COL_WOOD_DARK);
+        if (!powered) {
+            return;
+        }
+        float level = speaking ? 0.55f + 0.45f * (float) Math.abs(Math.sin(System.currentTimeMillis() / 90.0)) : 0.08f;
+        int fill = Math.round(w * level);
+        int color = speaking ? 0xFF33CC66 : 0xFF556644;
+        if (fill > 0) {
+            graphics.fill(x, barY, x + fill, barY + barH, color);
+        }
+    }
+
+    /** Spectrum marker for dial (frequency + relative strength). */
+    public record SpectrumMark(float frequency, float strength) {
+    }
+
     public static final class RadioSlider extends AbstractWidget {
         private final double min;
         private final double max;
@@ -119,6 +143,7 @@ public final class RadioWidgets {
         private final String maxLabel;
         private final Consumer<Double> onChange;
         private final Consumer<Double> onRelease;
+        private Supplier<List<SpectrumMark>> spectrumSupplier = Collections::emptyList;
         private double value;
         private boolean dragging;
         private long lastDebounceMs;
@@ -145,6 +170,10 @@ public final class RadioWidgets {
                            double min, double max, double initial, double wheelStep,
                            Consumer<Double> onChange, Consumer<Double> onRelease) {
             this(x, y, width, height, message, min, max, initial, wheelStep, false, null, null, onChange, onRelease);
+        }
+
+        public void setSpectrumSupplier(Supplier<List<SpectrumMark>> supplier) {
+            this.spectrumSupplier = supplier != null ? supplier : Collections::emptyList;
         }
 
         public double getValue() {
@@ -228,6 +257,21 @@ public final class RadioWidgets {
             int trackY = getY() + height / 2;
             graphics.fill(getX(), trackY - 2, getX() + width, trackY + 2, COL_WOOD);
             graphics.fill(getX() + 1, trackY - 1, getX() + width - 1, trackY + 1, COL_WOOD_MID);
+
+            // Spectrum peaks (nearby stations) above the track
+            List<SpectrumMark> marks = spectrumSupplier.get();
+            if (marks != null && max > min) {
+                for (SpectrumMark mark : marks) {
+                    if (mark.frequency() < min || mark.frequency() > max) {
+                        continue;
+                    }
+                    float n = (float) ((mark.frequency() - min) / (max - min));
+                    int mx = getX() + 4 + Math.round((width - 8) * n);
+                    int h = 3 + Math.round(7 * Mth.clamp(mark.strength(), 0f, 1f));
+                    int col = mark.strength() > 0.5f ? 0xFF44DD66 : mark.strength() > 0.2f ? 0xFFCCAA33 : 0xFF886633;
+                    graphics.fill(mx, trackY - 2 - h, mx + 2, trackY - 2, col);
+                }
+            }
 
             if (showDialTicks) {
                 int ticks = 9;

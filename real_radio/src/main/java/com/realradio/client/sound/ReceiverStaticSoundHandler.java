@@ -139,6 +139,7 @@ public final class ReceiverStaticSoundHandler {
             stop(pos);
         }
         STATES.clear();
+        StationSpectrumCache.clear();
     }
 
     private static final class ReceiverState {

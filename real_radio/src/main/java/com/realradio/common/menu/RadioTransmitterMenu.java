@@ -22,7 +22,7 @@ public class RadioTransmitterMenu extends AbstractContainerMenu {
 
     public static RadioTransmitterMenu fromNetwork(int containerId, Inventory inventory, FriendlyByteBuf buf) {
         BlockPos pos = buf.readBlockPos();
-        return new RadioTransmitterMenu(containerId, inventory, pos, new SimpleContainerData(4),
+        return new RadioTransmitterMenu(containerId, inventory, pos, new SimpleContainerData(5),
                 ContainerLevelAccess.create(inventory.player.level(), pos));
     }
 
@@ -45,6 +45,7 @@ public class RadioTransmitterMenu extends AbstractContainerMenu {
             data.set(1, be.isAM() ? 1 : 0);
             data.set(2, be.getRange());
             data.set(3, be.isActive() ? 1 : 0);
+            data.set(4, be.isSpeakingNow() ? 1 : 0);
         }
     }
 
@@ -66,6 +67,11 @@ public class RadioTransmitterMenu extends AbstractContainerMenu {
 
     public boolean isActive() {
         return data.get(3) != 0;
+    }
+
+    /** True while someone is speaking into this transmitter (mic activity). */
+    public boolean isSpeaking() {
+        return data.get(4) != 0;
     }
 
     public RadioBand getBand() {

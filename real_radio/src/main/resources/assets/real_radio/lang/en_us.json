@@ -7,7 +7,7 @@
   "gui.real_radio.frequency": "Frequency",
   "gui.real_radio.range": "Range: %s blocks",
   "gui.real_radio.range_auto": "Range: %s blocks (auto)",
-  "gui.real_radio.range_hint": "Lower frequency = farther reach",
+  "gui.real_radio.range_hint": "Lower frequency / higher placement = farther",
   "gui.real_radio.volume": "Volume: %s%%",
   "gui.real_radio.band_am": "AM",
   "gui.real_radio.band_fm": "FM",
@@ -21,6 +21,10 @@
   "gui.real_radio.signal_good": "Good",
   "gui.real_radio.signal_excellent": "Excellent",
   "gui.real_radio.on_air": "ON AIR",
+  "gui.real_radio.mic": "Mic",
+  "gui.real_radio.preset": "M%s",
+  "gui.real_radio.preset_hint": "Left-click: load · Right-click: save",
+  "gui.real_radio.spectrum_hint": "Peaks = nearby stations",
   "real_radio.line.radio": "Radio",
   "subtitles.real_radio.radio_static": "Radio static"
 }

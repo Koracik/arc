@@ -28,5 +28,17 @@ public final class ModNetwork {
                 ReceiverQualityPayload.STREAM_CODEC,
                 ReceiverQualityPayload::handle
         );
+
+        registrar.playToClient(
+                NearbyStationsPayload.TYPE,
+                NearbyStationsPayload.STREAM_CODEC,
+                NearbyStationsPayload::handle
+        );
+
+        registrar.playToServer(
+                RadioPresetPayload.TYPE,
+                RadioPresetPayload.STREAM_CODEC,
+                RadioPresetPayload::handle
+        );
     }
 }

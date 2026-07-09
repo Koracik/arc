@@ -1,11 +1,14 @@
 package com.realradio.client.gui;
 
 import com.realradio.common.menu.RadioTransmitterMenu;
+import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.config.RealRadioConfig;
+import com.realradio.network.RadioPresetPayload;
 import com.realradio.network.UpdateTransmitterPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -25,6 +28,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
     private Button powerButton;
     private Button freqMinus;
     private Button freqPlus;
+    private final Button[] presetButtons = new Button[ChannelPresets.COUNT];
 
     public RadioTransmitterScreen(RadioTransmitterMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -53,6 +57,21 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         freqPlus = RadioWidgets.stepButton(sliderX + sliderW + 2, y + 78, 16, "+", () -> stepFrequency(1));
         addRenderableWidget(freqPlus);
 
+        int presetY = y + 140;
+        int pw = (contentW - 8) / 3;
+        for (int i = 0; i < ChannelPresets.COUNT; i++) {
+            final int slot = i;
+            presetButtons[i] = Button.builder(
+                    Component.translatable("gui.real_radio.preset", slot + 1),
+                    b -> {
+                        PacketDistributor.sendToServer(new RadioPresetPayload(blockPos, true, slot, false));
+                        playClick();
+                    }
+            ).bounds(x + 16 + i * (pw + 4), presetY, pw, 18).build();
+            presetButtons[i].setTooltip(Tooltip.create(Component.translatable("gui.real_radio.preset_hint")));
+            addRenderableWidget(presetButtons[i]);
+        }
+
         int btnW = (contentW - 8) / 2;
         amFmButton = Button.builder(amFmLabel(), b -> {
             isAM = !isAM;
@@ -61,7 +80,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
             b.setMessage(amFmLabel());
             playClick();
             sendUpdate();
-        }).bounds(x + 16, y + 148, btnW, 20).build();
+        }).bounds(x + 16, y + 164, btnW, 20).build();
         addRenderableWidget(amFmButton);
 
         powerButton = Button.builder(powerLabel(), b -> {
@@ -69,8 +88,23 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
             b.setMessage(powerLabel());
             playClick();
             sendUpdate();
-        }).bounds(x + 16 + btnW + 8, y + 148, btnW, 20).build();
+        }).bounds(x + 16 + btnW + 8, y + 164, btnW, 20).build();
         addRenderableWidget(powerButton);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 1) {
+            for (int i = 0; i < presetButtons.length; i++) {
+                Button b = presetButtons[i];
+                if (b != null && b.isMouseOver(mouseX, mouseY)) {
+                    PacketDistributor.sendToServer(new RadioPresetPayload(blockPos, true, i, true));
+                    playClick();
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void rebuildFrequencyWidgets() {
@@ -129,15 +163,13 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         return RadioBand.fromAm(isAM);
     }
 
-    /** Prefer server-synced range (includes night AM boost) when band/freq are in sync. */
     private int displayRange() {
         int local = band().rangeBlocks(frequency);
         int menuRange = menu.getRange();
         if (menuRange > local) {
-            // Night boost or config on server
             return menuRange;
         }
-        return local;
+        return Math.max(local, menuRange);
     }
 
     private Component amFmLabel() {
@@ -159,6 +191,32 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
     }
 
     @Override
+    protected void containerTick() {
+        super.containerTick();
+        float menuFreq = menu.getFrequency();
+        boolean menuAm = menu.isAM();
+        if (menuAm != isAM || Math.abs(menuFreq - frequency) > 0.001f) {
+            if (frequencySlider == null || !frequencySlider.isHovered()) {
+                boolean bandChanged = menuAm != isAM;
+                isAM = menuAm;
+                frequency = menuFreq;
+                if (bandChanged) {
+                    rebuildFrequencyWidgets();
+                } else if (frequencySlider != null) {
+                    frequencySlider.setValue(frequency);
+                }
+                if (amFmButton != null) {
+                    amFmButton.setMessage(amFmLabel());
+                }
+            }
+        }
+        active = menu.isActive();
+        if (powerButton != null) {
+            powerButton.setMessage(powerLabel());
+        }
+    }
+
+    @Override
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         super.renderBg(graphics, partialTick, mouseX, mouseY);
         drawPowerLed(graphics, active);
@@ -171,12 +229,16 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
 
         int range = displayRange();
         String rangeLabel = Component.translatable("gui.real_radio.range_auto", range).getString();
-        int maxVisual = Math.round(RealRadioConfig.baseRangeBlocks() * 3.0f * RealRadioConfig.amNightMultiplier());
-        RadioWidgets.drawRangeBar(graphics, font, leftPos + 16, topPos + 108, imageWidth - 32,
+        int maxVisual = Math.round(RealRadioConfig.baseRangeBlocks() * 3.0f
+                * RealRadioConfig.amNightMultiplier() * RealRadioConfig.antennaHeightBonus());
+        RadioWidgets.drawRangeBar(graphics, font, leftPos + 16, topPos + 104, imageWidth - 32,
                 range, maxVisual, rangeLabel);
 
         graphics.drawString(font,
                 Component.translatable("gui.real_radio.range_hint").getString(),
-                leftPos + 16, topPos + 130, RadioWidgets.COL_AMBER_DIM, false);
+                leftPos + 16, topPos + 124, RadioWidgets.COL_AMBER_DIM, false);
+
+        RadioWidgets.drawMicMeter(graphics, font, leftPos + 16, topPos + 190, imageWidth - 32,
+                menu.isSpeaking(), active);
     }
 }
