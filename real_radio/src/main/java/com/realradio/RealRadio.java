@@ -7,15 +7,16 @@ import com.realradio.common.registry.ModCreativeTabs;
 import com.realradio.common.registry.ModItems;
 import com.realradio.common.registry.ModMenus;
 import com.realradio.common.registry.ModSounds;
+import com.realradio.config.RealRadioConfig;
 import com.realradio.integration.plasmovoice.PlasmoVoiceBootstrap;
 import com.realradio.network.ModNetwork;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +26,9 @@ public final class RealRadio {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public RealRadio(IEventBus modBus, ModContainer container) {
+        // config/real_radio-common.toml — base range (default 2500 blocks)
+        container.registerConfig(ModConfig.Type.COMMON, RealRadioConfig.SPEC);
+
         ModBlocks.REGISTER.register(modBus);
         ModItems.REGISTER.register(modBus);
         ModBlockEntities.REGISTER.register(modBus);

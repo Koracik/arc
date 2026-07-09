@@ -1,40 +1,45 @@
 package com.realradio.common.util;
 
+import com.realradio.config.RealRadioConfig;
+
 /**
  * Radio modulation band with realistic frequency ranges and step sizes.
  * <ul>
- *   <li>FM — 87.5…108.0 MHz, step 0.1 MHz — short (line-of-sight) range</li>
+ *   <li>FM — 87.5…108.0 MHz, step 0.1 MHz — shorter (line-of-sight) range</li>
  *   <li>AM — 530…1600 kHz, step 10 kHz — longer ground-wave range</li>
  * </ul>
  * Frequencies are stored in band units (MHz for FM, kHz for AM).
  * <p>
- * Transmission range is derived from frequency (lower → farther), not player-chosen power.
+ * Transmission range is derived from {@link RealRadioConfig#baseRangeBlocks()} and frequency
+ * (lower → farther; AM farther than FM), not player-chosen power.
  */
 public enum RadioBand {
     /**
-     * FM VHF: ~100–180 blocks. Lower MHz propagates slightly farther.
+     * FM: {@code base × 1.0} … {@code base × 1.5} (low MHz = farther).
      */
-    FM(87.5f, 108.0f, 0.1f, 0.2f, 180, 100),
+    FM(87.5f, 108.0f, 0.1f, 0.2f, 1.5f, 1.0f),
     /**
-     * AM MF: ~280–520 blocks. Lower kHz propagates farther (classic AM behaviour).
+     * AM: {@code base × 2.0} … {@code base × 3.0} (low kHz = farther).
      */
-    AM(530.0f, 1600.0f, 10.0f, 20.0f, 520, 280);
+    AM(530.0f, 1600.0f, 10.0f, 20.0f, 3.0f, 2.0f);
 
     private final float minFrequency;
     private final float maxFrequency;
     private final float step;
     private final float tuningTolerance;
-    private final int maxRangeBlocks;
-    private final int minRangeBlocks;
+    /** Multiplier of base range at the lowest frequency in this band. */
+    private final float maxRangeMultiplier;
+    /** Multiplier of base range at the highest frequency in this band. */
+    private final float minRangeMultiplier;
 
     RadioBand(float minFrequency, float maxFrequency, float step, float tuningTolerance,
-              int maxRangeBlocks, int minRangeBlocks) {
+              float maxRangeMultiplier, float minRangeMultiplier) {
         this.minFrequency = minFrequency;
         this.maxFrequency = maxFrequency;
         this.step = step;
         this.tuningTolerance = tuningTolerance;
-        this.maxRangeBlocks = maxRangeBlocks;
-        this.minRangeBlocks = minRangeBlocks;
+        this.maxRangeMultiplier = maxRangeMultiplier;
+        this.minRangeMultiplier = minRangeMultiplier;
     }
 
     public float minFrequency() {
@@ -56,25 +61,29 @@ public enum RadioBand {
 
     /**
      * Effective broadcast range in blocks for the given frequency.
+     * Scaled from {@link RealRadioConfig#baseRangeBlocks()} (default 2500).
      * Lower frequencies reach farther within the band (and AM &gt; FM overall).
      */
     public int rangeBlocks(float frequency) {
+        int base = RealRadioConfig.baseRangeBlocks();
         float f = clamp(frequency);
         float span = maxFrequency - minFrequency;
+        float mult;
         if (span <= 0.0f) {
-            return maxRangeBlocks;
+            mult = maxRangeMultiplier;
+        } else {
+            // t = 0 at lowest freq (max range), 1 at highest (min range)
+            float t = (f - minFrequency) / span;
+            t = Math.max(0.0f, Math.min(1.0f, t));
+            mult = maxRangeMultiplier + (minRangeMultiplier - maxRangeMultiplier) * t;
         }
-        // t = 0 at lowest freq (max range), 1 at highest (min range)
-        float t = (f - minFrequency) / span;
-        t = Math.max(0.0f, Math.min(1.0f, t));
-        return Math.round(maxRangeBlocks + (minRangeBlocks - maxRangeBlocks) * t);
+        return Math.max(1, Math.round(base * mult));
     }
 
     /** @deprecated use {@link #rangeBlocks(float)}; kept for call-site migration */
     @Deprecated
     public float rangeMultiplier() {
-        // Approximate mid-band AM/FM ratio for any leftover callers
-        return isAM() ? 3.0f : 1.0f;
+        return isAM() ? 2.5f : 1.25f;
     }
 
     public boolean isAM() {

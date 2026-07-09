@@ -7,7 +7,9 @@ Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo 
 - **Radio Transmitter** — captures nearby player voice (4-block radius) and broadcasts on AM/FM
 - **Radio Receiver** — plays received voice as a 3D Plasmo Voice static source
 - **AM / FM** bands with realistic frequency-based range (not player-chosen power)
+  - Base range is configurable (`baseRangeBlocks`, default **2500** blocks)
   - Lower frequency → farther reach; AM covers more ground than FM
+  - Config file: `config/real_radio-common.toml`
 - **Tuning tolerance** — slight detuning still works, but voice is much quieter (sharp curve)
 - **Distance falloff** — linear for AM, cubic for FM
 - **White-noise static** via Minecraft sound engine (`real_radio:radio_static`), kept quiet
