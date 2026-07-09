@@ -47,9 +47,11 @@
 | 10 | **`realismMode`** — hide spectrum / S-meter / signal % (find by ear) | done |
 
 Конфиг (`config/real_radio-common.toml`):
+- `[gameplay]` **`realismMode`** (default true) — вкл/выкл в `config/real_radio-common.toml`
 - `[range]` `baseRangeBlocks`, `amNightMultiplier`, `antennaHeightBonus`
-- `[audio]` `squelchThreshold` (voice only), `staticVolumeScale` (default 0.05), `enableAgc`, `agcExponent`, **`realismMode`** (default true)
+- `[audio]` `squelchThreshold` (voice only), `staticVolumeScale` (default 0.05), `enableAgc`, `agcExponent`
 - `[propagation]` `enableLineOfSight`, `losSampleStep`, `losMaxPenalty`, `fmRainFactor`, `fmThunderFactor`
+- Пример файла: [`config-example.toml`](config-example.toml)
 
 ---
 

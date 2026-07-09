@@ -1,0 +1,28 @@
+# Example: config/real_radio-common.toml
+# Copy/merge into your world or game config folder after first launch.
+# Path: <minecraft>/config/real_radio-common.toml
+# For a dedicated server: <server>/config/real_radio-common.toml
+# Restart (or use /reload if supported) after changes. Prefer full restart.
+
+[gameplay]
+	# true  = realism: no spectrum, no S-meter, no signal %
+	# false = assist UI with station peaks and quality meter
+	realismMode = true
+
+[range]
+	baseRangeBlocks = 2500
+	amNightMultiplier = 1.3
+	antennaHeightBonus = 1.35
+
+[audio]
+	squelchThreshold = 0.08
+	staticVolumeScale = 0.05
+	enableAgc = true
+	agcExponent = 0.85
+
+[propagation]
+	enableLineOfSight = true
+	losSampleStep = 6
+	losMaxPenalty = 0.85
+	fmRainFactor = 0.85
+	fmThunderFactor = 0.7

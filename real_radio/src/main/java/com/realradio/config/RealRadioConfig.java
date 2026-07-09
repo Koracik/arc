@@ -27,6 +27,23 @@ public final class RealRadioConfig {
     public static final ModConfigSpec.DoubleValue FM_THUNDER_FACTOR;
 
     static {
+        // --- gameplay (toggle modes here) ---
+        BUILDER.comment(
+                "Real Radio — gameplay modes",
+                "File: config/real_radio-common.toml (client AND server)"
+        ).push("gameplay");
+
+        REALISM_MODE = BUILDER
+                .comment(
+                        "=== REALISM MODE (enable/disable here) ===",
+                        "true  = hide spectrum peaks, S-meter, signal % — find stations by ear only",
+                        "false = show station assist (spectrum + quality meter)",
+                        "Set this on both client and dedicated server for multiplayer."
+                )
+                .define("realismMode", true);
+
+        BUILDER.pop();
+
         BUILDER.comment("Real Radio — transmission range").push("range");
 
         BASE_RANGE_BLOCKS = BUILDER
@@ -72,13 +89,6 @@ public final class RealRadioConfig {
         AGC_EXPONENT = BUILDER
                 .comment("AGC curve exponent (<1 lifts weak signals). Default 0.85.")
                 .defineInRange("agcExponent", 0.85, 0.5, 1.0);
-
-        REALISM_MODE = BUILDER
-                .comment(
-                        "Realism mode: hide spectrum peaks, S-meter, signal %, station markers.",
-                        "Player must find stations by ear only (recommended for immersion)."
-                )
-                .define("realismMode", true);
 
         BUILDER.pop();
 

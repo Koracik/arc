@@ -14,6 +14,8 @@ Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo 
 - **Spectrum peaks** on the receiver dial for nearby stations
 - **Vintage GUI**: wooden chrome, LCD, ±, S-meter, mic meter, ON AIR
 - Full plan: [`ROADMAP.md`](ROADMAP.md) · config: `config/real_radio-common.toml`
+  - **Realism mode:** `[gameplay] realismMode = true` (or `false` for assist UI)
+  - Example: [`config-example.toml`](config-example.toml)
 
 ## Requirements
 
