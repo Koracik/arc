@@ -54,11 +54,15 @@ public final class RealRadioClientAddon implements AddonInitializer {
 
     @EventSubscribe
     public void onAlSourceWrite(AlSourceWriteEvent event) {
-        // Re-apply gain each buffer write so quality updates are heard immediately
+        // Re-apply gain each buffer write so quality / volume-slider updates are heard live
         AlSource al = event.getSource();
         float gain = currentGainForAlSource(al);
+        // Always apply (including 0) so the volume slider never "sticks" until zero
         if (gain >= 0.0f) {
-            al.setVolume(gain);
+            try {
+                al.setVolume(Math.max(0.0f, Math.min(1.0f, gain)));
+            } catch (Throwable ignored) {
+            }
         }
     }
 

@@ -36,7 +36,7 @@ public final class RadioWidgets {
         private double value;
         private boolean dragging;
         private long lastDebounceMs;
-        private static final long DEBOUNCE_MS = 100L;
+        private static final long DEBOUNCE_MS = 50L;
 
         public RadioSlider(int x, int y, int width, int height, Component message,
                            double min, double max, double initial,
@@ -68,7 +68,7 @@ public final class RadioWidgets {
             double n = Mth.clamp((mouseX - (getX() + 4)) / (double) (width - 8), 0.0, 1.0);
             value = min + n * (max - min);
             onChange.accept(value);
-            // Debounced network update while dragging
+            // Debounced network update while dragging so volume/freq apply live
             long now = System.currentTimeMillis();
             if (now - lastDebounceMs >= DEBOUNCE_MS) {
                 lastDebounceMs = now;
@@ -113,9 +113,12 @@ public final class RadioWidgets {
             graphics.fill(knobX, getY() + 2, knobX + 6, getY() + height - 2, 0xFFE8D5A3);
             graphics.fill(knobX + 1, getY() + 3, knobX + 5, getY() + height - 3, 0xFF8B6914);
 
-            // Label
+            // Label drawn ABOVE the track with a dark strip so it never collides with the knob/track
             String text = getMessage().getString();
-            graphics.drawString(Minecraft.getInstance().font, text, getX(), getY() - 10, 0xFFE8D5A3, false);
+            int labelY = getY() - 12;
+            int textW = Minecraft.getInstance().font.width(text);
+            graphics.fill(getX() - 1, labelY - 1, getX() + Math.min(width, textW + 4), labelY + 10, 0xAA1A1208);
+            graphics.drawString(Minecraft.getInstance().font, text, getX(), labelY, 0xFFE8D5A3, false);
         }
 
         @Override

@@ -1,6 +1,5 @@
 package com.realradio.client.gui;
 
-import com.realradio.common.blockentity.RadioTransmitterBlockEntity;
 import com.realradio.common.menu.RadioTransmitterMenu;
 import com.realradio.common.util.RadioBand;
 import com.realradio.network.UpdateTransmitterPayload;
@@ -16,11 +15,9 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
 
     private float frequency;
     private boolean isAM;
-    private int range;
     private boolean active;
 
     private RadioWidgets.RadioSlider frequencySlider;
-    private RadioWidgets.RadioSlider rangeSlider;
     private Button amFmButton;
     private Button powerButton;
 
@@ -29,7 +26,6 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         this.blockPos = menu.getBlockPos();
         this.frequency = menu.getFrequency();
         this.isAM = menu.isAM();
-        this.range = menu.getRange();
         this.active = menu.isActive();
     }
 
@@ -39,50 +35,37 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
 
         int x = leftPos;
         int y = topPos;
+        int sliderW = imageWidth - 32;
 
-        frequencySlider = createFrequencySlider(x + 16, y + 48);
+        frequencySlider = createFrequencySlider(x + 16, y + 44);
         addRenderableWidget(frequencySlider);
 
-        rangeSlider = new RadioWidgets.RadioSlider(
-                x + 16, y + 84, 164, 16,
-                rangeLabel(),
-                RadioTransmitterBlockEntity.MIN_RANGE,
-                RadioTransmitterBlockEntity.MAX_RANGE,
-                range,
-                v -> {
-                    range = (int) Math.round(v);
-                    rangeSlider.setMessage(rangeLabel());
-                },
-                v -> {
-                    range = (int) Math.round(v);
-                    rangeSlider.setMessage(rangeLabel());
-                    sendUpdate();
-                }
-        );
-        addRenderableWidget(rangeSlider);
+        // No range slider — range is derived from frequency (shown as read-only info)
 
+        int btnW = (sliderW - 8) / 2;
         amFmButton = Button.builder(amFmLabel(), b -> {
             isAM = !isAM;
             frequency = band().defaultFrequency();
             removeWidget(frequencySlider);
-            frequencySlider = createFrequencySlider(leftPos + 16, topPos + 48);
+            frequencySlider = createFrequencySlider(leftPos + 16, topPos + 44);
             addRenderableWidget(frequencySlider);
             b.setMessage(amFmLabel());
             sendUpdate();
-        }).bounds(x + 16, y + 110, 70, 20).build();
+        }).bounds(x + 16, y + 100, btnW, 20).build();
         addRenderableWidget(amFmButton);
 
         powerButton = Button.builder(powerLabel(), b -> {
             active = !active;
             b.setMessage(powerLabel());
             sendUpdate();
-        }).bounds(x + 110, y + 110, 70, 20).build();
+        }).bounds(x + 16 + btnW + 8, y + 100, btnW, 20).build();
         addRenderableWidget(powerButton);
     }
 
     private RadioWidgets.RadioSlider createFrequencySlider(int x, int y) {
+        int sliderW = imageWidth - 32;
         return new RadioWidgets.RadioSlider(
-                x, y, 164, 16,
+                x, y, sliderW, 16,
                 frequencyLabel(),
                 band().minFrequency(), band().maxFrequency(), frequency,
                 v -> {
@@ -102,14 +85,14 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         return RadioBand.fromAm(isAM);
     }
 
+    private int autoRange() {
+        return band().rangeBlocks(frequency);
+    }
+
     private Component frequencyLabel() {
         return Component.literal(
                 Component.translatable("gui.real_radio.frequency").getString() + ": " + band().format(frequency)
         );
-    }
-
-    private Component rangeLabel() {
-        return Component.translatable("gui.real_radio.range", range);
     }
 
     private Component amFmLabel() {
@@ -121,7 +104,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
     }
 
     private void sendUpdate() {
-        PacketDistributor.sendToServer(new UpdateTransmitterPayload(blockPos, frequency, isAM, range, active));
+        PacketDistributor.sendToServer(new UpdateTransmitterPayload(blockPos, frequency, isAM, active));
     }
 
     @Override
@@ -129,5 +112,12 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         super.renderBg(graphics, partialTick, mouseX, mouseY);
         int ledColor = active ? 0xFF33FF66 : 0xFF662222;
         graphics.fill(leftPos + imageWidth - 18, topPos + 10, leftPos + imageWidth - 10, topPos + 18, ledColor);
+
+        // Auto range info (read-only) — sits between frequency slider and buttons
+        String rangeText = Component.translatable("gui.real_radio.range_auto", autoRange()).getString();
+        graphics.drawString(font, rangeText, leftPos + 16, topPos + 74, 0xFFE8D5A3, false);
+        String hint = Component.translatable("gui.real_radio.range_hint").getString();
+        graphics.drawString(font, font.plainSubstrByWidth(hint, imageWidth - 32),
+                leftPos + 16, topPos + 86, 0xFFA89870, false);
     }
 }

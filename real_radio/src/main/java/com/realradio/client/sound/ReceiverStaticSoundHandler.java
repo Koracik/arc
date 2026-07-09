@@ -3,7 +3,7 @@ package com.realradio.client.sound;
 import com.realradio.common.registry.ModSounds;
 import com.realradio.network.ReceiverQualityPayload;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.sounds.SoundSource;
@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Plays looping white-noise around active receivers.
- * {@code staticVolume = (1 - quality) * receiverVolume * 0.5}
+ * Uses {@link AbstractTickableSoundInstance} so volume updates apply every tick
+ * (SimpleSoundInstance only samples volume when started — which broke the volume slider).
  */
 public final class ReceiverStaticSoundHandler {
     private static final Map<BlockPos, ReceiverState> STATES = new ConcurrentHashMap<>();
@@ -112,7 +113,8 @@ public final class ReceiverStaticSoundHandler {
                 state.sound = new LoopingStaticSound(pos, volume);
                 mc.getSoundManager().play(state.sound);
             } else if (state.sound instanceof LoopingStaticSound looping) {
-                looping.setVolume(volume);
+                // Tickable sound re-reads volume each engine tick → live volume slider
+                looping.setDynamicVolume(volume);
             }
         }
     }
@@ -155,37 +157,32 @@ public final class ReceiverStaticSoundHandler {
     }
 
     /**
-     * Positioned looping static noise instance.
+     * Positioned looping static noise that updates volume every sound-engine tick.
+     * Critical for the receiver volume slider — non-tickable instances ignore mid-play changes.
      */
-    private static final class LoopingStaticSound extends SimpleSoundInstance {
-        private float dynamicVolume;
-
+    private static final class LoopingStaticSound extends AbstractTickableSoundInstance {
         LoopingStaticSound(BlockPos pos, float volume) {
-            super(
-                    ModSounds.RADIO_STATIC.get().getLocation(),
-                    SoundSource.BLOCKS,
-                    volume,
-                    1.0f,
-                    SoundInstance.createUnseededRandom(),
-                    true,
-                    0,
-                    SoundInstance.Attenuation.LINEAR,
-                    pos.getX() + 0.5,
-                    pos.getY() + 0.5,
-                    pos.getZ() + 0.5,
-                    false
-            );
-            this.dynamicVolume = volume;
+            super(ModSounds.RADIO_STATIC.get(), SoundSource.BLOCKS, SoundInstance.createUnseededRandom());
+            this.looping = true;
+            this.delay = 0;
+            this.volume = Math.max(0.0f, volume);
+            this.pitch = 1.0f;
+            this.x = pos.getX() + 0.5;
+            this.y = pos.getY() + 0.5;
+            this.z = pos.getZ() + 0.5;
+            this.attenuation = Attenuation.LINEAR;
+            this.relative = false;
         }
 
-        void setVolume(float volume) {
-            this.dynamicVolume = volume;
-            this.volume = volume;
+        void setDynamicVolume(float volume) {
+            this.volume = Math.max(0.0f, volume);
         }
 
         @Override
-        public float getVolume() {
-            return dynamicVolume;
+        public void tick() {
+            if (this.volume <= 0.001f) {
+                this.stop();
+            }
         }
     }
 }

@@ -15,8 +15,9 @@ public abstract class AbstractRadioScreen<T extends AbstractContainerMenu> exten
     protected static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(RealRadio.MOD_ID, "textures/gui/radio.png");
 
-    protected static final int GUI_WIDTH = 196;
-    protected static final int GUI_HEIGHT = 166;
+    /** Wide enough for Russian power labels; tall enough for spaced rows without overlap. */
+    protected static final int GUI_WIDTH = 210;
+    protected static final int GUI_HEIGHT = 180;
 
     protected AbstractRadioScreen(T menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
@@ -24,6 +25,7 @@ public abstract class AbstractRadioScreen<T extends AbstractContainerMenu> exten
         this.imageHeight = GUI_HEIGHT;
         this.inventoryLabelY = 10000; // hide player inv label (no slots)
         this.titleLabelY = 8;
+        this.titleLabelX = 12;
     }
 
     @Override
@@ -48,6 +50,9 @@ public abstract class AbstractRadioScreen<T extends AbstractContainerMenu> exten
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY, 0xFFE8D5A3, false);
+        // Leave room for the LED in the top-right
+        int maxTitleW = imageWidth - 36;
+        String titleText = font.plainSubstrByWidth(title.getString(), maxTitleW);
+        graphics.drawString(font, titleText, titleLabelX, titleLabelY, 0xFFE8D5A3, false);
     }
 }

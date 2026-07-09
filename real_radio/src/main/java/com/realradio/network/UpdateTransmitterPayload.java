@@ -11,11 +11,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+/**
+ * Client → server: transmitter settings.
+ * Range is not included — it is derived from frequency on the server.
+ */
 public record UpdateTransmitterPayload(
         BlockPos pos,
         float frequency,
         boolean isAM,
-        int range,
         boolean active
 ) implements CustomPacketPayload {
     public static final Type<UpdateTransmitterPayload> TYPE =
@@ -26,7 +29,6 @@ public record UpdateTransmitterPayload(
                     BlockPos.STREAM_CODEC, UpdateTransmitterPayload::pos,
                     ByteBufCodecs.FLOAT, UpdateTransmitterPayload::frequency,
                     ByteBufCodecs.BOOL, UpdateTransmitterPayload::isAM,
-                    ByteBufCodecs.VAR_INT, UpdateTransmitterPayload::range,
                     ByteBufCodecs.BOOL, UpdateTransmitterPayload::active,
                     UpdateTransmitterPayload::new
             );
@@ -45,7 +47,7 @@ public record UpdateTransmitterPayload(
                 if (player.distanceToSqr(payload.pos.getX() + 0.5, payload.pos.getY() + 0.5, payload.pos.getZ() + 0.5) > 64.0) {
                     return;
                 }
-                be.applySettings(payload.frequency, payload.isAM, payload.range, payload.active);
+                be.applySettings(payload.frequency, payload.isAM, payload.active);
             }
         });
     }

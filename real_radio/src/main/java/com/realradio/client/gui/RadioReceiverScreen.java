@@ -38,12 +38,15 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
 
         int x = leftPos;
         int y = topPos;
+        int sliderW = imageWidth - 32;
 
-        frequencySlider = createFrequencySlider(x + 16, y + 48);
+        // Row 1: frequency (label lives above slider inside widget → leave 14px headroom)
+        frequencySlider = createFrequencySlider(x + 16, y + 44);
         addRenderableWidget(frequencySlider);
 
+        // Row 2: volume — 36px gap so labels never collide
         volumeSlider = new RadioWidgets.RadioSlider(
-                x + 16, y + 84, 164, 16,
+                x + 16, y + 80, sliderW, 16,
                 volumeLabel(),
                 0.0, 1.0, volume,
                 v -> {
@@ -58,28 +61,31 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         );
         addRenderableWidget(volumeSlider);
 
+        // Row 3: band + power — full-width halves with gap
+        int btnW = (sliderW - 8) / 2;
         amFmButton = Button.builder(amFmLabel(), b -> {
             isAM = !isAM;
             frequency = band().defaultFrequency();
             removeWidget(frequencySlider);
-            frequencySlider = createFrequencySlider(leftPos + 16, topPos + 48);
+            frequencySlider = createFrequencySlider(leftPos + 16, topPos + 44);
             addRenderableWidget(frequencySlider);
             b.setMessage(amFmLabel());
             sendUpdate();
-        }).bounds(x + 16, y + 110, 70, 20).build();
+        }).bounds(x + 16, y + 112, btnW, 20).build();
         addRenderableWidget(amFmButton);
 
         powerButton = Button.builder(powerLabel(), b -> {
             active = !active;
             b.setMessage(powerLabel());
             sendUpdate();
-        }).bounds(x + 110, y + 110, 70, 20).build();
+        }).bounds(x + 16 + btnW + 8, y + 112, btnW, 20).build();
         addRenderableWidget(powerButton);
     }
 
     private RadioWidgets.RadioSlider createFrequencySlider(int x, int y) {
+        int sliderW = imageWidth - 32;
         return new RadioWidgets.RadioSlider(
-                x, y, 164, 16,
+                x, y, sliderW, 16,
                 frequencyLabel(),
                 band().minFrequency(), band().maxFrequency(), frequency,
                 v -> {
@@ -127,11 +133,11 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         int ledColor = active ? 0xFF33FF66 : 0xFF662222;
         graphics.fill(leftPos + imageWidth - 18, topPos + 10, leftPos + imageWidth - 10, topPos + 18, ledColor);
 
-        // Signal strength meter
+        // Signal strength meter — below buttons with clear gap
         float quality = menu.getSignalQuality();
         int meterX = leftPos + 16;
-        int meterY = topPos + 138;
-        int meterW = 164;
+        int meterY = topPos + 152;
+        int meterW = imageWidth - 32;
         graphics.fill(meterX, meterY, meterX + meterW, meterY + 8, 0xFF2A1F12);
         int fill = Math.round(meterW * quality);
         int color = quality > 0.66f ? 0xFF33CC55 : quality > 0.33f ? 0xFFCCAA33 : 0xFFCC4433;
@@ -140,6 +146,6 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         }
         graphics.drawString(font,
                 Component.translatable("gui.real_radio.signal", Math.round(quality * 100)).getString(),
-                meterX, meterY - 10, 0xFFE8D5A3, false);
+                meterX, meterY - 11, 0xFFE8D5A3, false);
     }
 }

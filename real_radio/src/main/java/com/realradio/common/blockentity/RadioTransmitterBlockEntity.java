@@ -25,22 +25,20 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Captures voice of players within {@link #CAPTURE_RADIUS} blocks and broadcasts
  * on the configured frequency / band.
+ * <p>
+ * Broadcast range is derived from frequency (lower → farther; AM ≫ FM), not set by the player.
  */
 public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProvider {
     public static final int CAPTURE_RADIUS = 4;
-    public static final int MIN_RANGE = 50;
-    public static final int MAX_RANGE = 500;
-    public static final int DEFAULT_RANGE = 150;
 
     private static final int DATA_FREQUENCY_BITS = 0;
     private static final int DATA_IS_AM = 1;
-    private static final int DATA_RANGE = 2;
+    private static final int DATA_RANGE = 2; // computed range for GUI sync
     private static final int DATA_ACTIVE = 3;
     private static final int DATA_COUNT = 4;
 
     private float frequency = RadioBand.FM.defaultFrequency();
     private boolean isAM;
-    private int range = DEFAULT_RANGE;
     private boolean active;
 
     private final ContainerData dataAccess = new ContainerData() {
@@ -49,7 +47,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
             return switch (index) {
                 case DATA_FREQUENCY_BITS -> Float.floatToIntBits(frequency);
                 case DATA_IS_AM -> isAM ? 1 : 0;
-                case DATA_RANGE -> range;
+                case DATA_RANGE -> getRange();
                 case DATA_ACTIVE -> active ? 1 : 0;
                 default -> 0;
             };
@@ -60,7 +58,9 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
             switch (index) {
                 case DATA_FREQUENCY_BITS -> frequency = Float.intBitsToFloat(value);
                 case DATA_IS_AM -> isAM = value != 0;
-                case DATA_RANGE -> range = value;
+                case DATA_RANGE -> {
+                    // Range is frequency-derived; ignore client writes
+                }
                 case DATA_ACTIVE -> active = value != 0;
                 default -> {
                 }
@@ -146,13 +146,12 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         return RadioBand.fromAm(isAM);
     }
 
+    /**
+     * Effective broadcast range in blocks — computed from band + frequency.
+     * Lower frequencies travel farther; AM covers more ground than FM.
+     */
     public int getRange() {
-        return range;
-    }
-
-    public void setRange(int range) {
-        this.range = Math.max(MIN_RANGE, Math.min(MAX_RANGE, range));
-        setChangedAndSync();
+        return getBand().rangeBlocks(frequency);
     }
 
     public boolean isActive() {
@@ -168,10 +167,9 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         return dataAccess;
     }
 
-    public void applySettings(float frequency, boolean isAM, int range, boolean active) {
+    public void applySettings(float frequency, boolean isAM, boolean active) {
         this.isAM = isAM;
         this.frequency = getBand().snap(frequency);
-        this.range = Math.max(MIN_RANGE, Math.min(MAX_RANGE, range));
         this.active = active;
         setChangedAndSync();
     }
@@ -189,8 +187,8 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         super.saveAdditional(tag, registries);
         tag.putFloat("frequency", frequency);
         tag.putBoolean("isAM", isAM);
-        tag.putInt("range", range);
         tag.putBoolean("active", active);
+        // Legacy "range" no longer stored — range is derived from frequency
     }
 
     @Override
@@ -198,9 +196,8 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         super.loadAdditional(tag, registries);
         isAM = tag.getBoolean("isAM");
         frequency = getBand().snap(tag.contains("frequency") ? tag.getFloat("frequency") : getBand().defaultFrequency());
-        range = tag.contains("range") ? tag.getInt("range") : DEFAULT_RANGE;
-        range = Math.max(MIN_RANGE, Math.min(MAX_RANGE, range));
         active = tag.getBoolean("active");
+        // Ignore legacy "range" NBT if present
     }
 
     @Override
