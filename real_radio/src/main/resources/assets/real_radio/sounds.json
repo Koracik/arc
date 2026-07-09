@@ -1,0 +1,11 @@
+{
+  "radio_static": {
+    "subtitle": "subtitles.real_radio.radio_static",
+    "sounds": [
+      {
+        "name": "real_radio:radio_static",
+        "stream": false
+      }
+    ]
+  }
+}

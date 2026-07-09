@@ -1,0 +1,17 @@
+{
+  "itemGroup.real_radio": "Реалистичное радио",
+  "block.real_radio.radio_transmitter": "Радио-передатчик",
+  "block.real_radio.radio_receiver": "Радио-приёмник",
+  "item.real_radio.radio_transmitter": "Радио-передатчик",
+  "item.real_radio.radio_receiver": "Радио-приёмник",
+  "gui.real_radio.frequency": "Частота",
+  "gui.real_radio.range": "Мощность: %s блоков",
+  "gui.real_radio.volume": "Громкость: %s%%",
+  "gui.real_radio.band_am": "AM",
+  "gui.real_radio.band_fm": "FM",
+  "gui.real_radio.power_on": "Питание: ВКЛ",
+  "gui.real_radio.power_off": "Питание: ВЫКЛ",
+  "gui.real_radio.signal": "Сигнал: %s%%",
+  "real_radio.line.radio": "Радио",
+  "subtitles.real_radio.radio_static": "Шипение радио"
+}

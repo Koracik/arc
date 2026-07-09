@@ -1,0 +1,17 @@
+{
+  "itemGroup.real_radio": "Real Radio",
+  "block.real_radio.radio_transmitter": "Radio Transmitter",
+  "block.real_radio.radio_receiver": "Radio Receiver",
+  "item.real_radio.radio_transmitter": "Radio Transmitter",
+  "item.real_radio.radio_receiver": "Radio Receiver",
+  "gui.real_radio.frequency": "Frequency",
+  "gui.real_radio.range": "Power: %s blocks",
+  "gui.real_radio.volume": "Volume: %s%%",
+  "gui.real_radio.band_am": "AM",
+  "gui.real_radio.band_fm": "FM",
+  "gui.real_radio.power_on": "Power: ON",
+  "gui.real_radio.power_off": "Power: OFF",
+  "gui.real_radio.signal": "Signal: %s%%",
+  "real_radio.line.radio": "Radio",
+  "subtitles.real_radio.radio_static": "Radio static"
+}
