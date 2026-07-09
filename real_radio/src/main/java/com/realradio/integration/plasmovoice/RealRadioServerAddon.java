@@ -143,21 +143,18 @@ public final class RealRadioServerAddon implements AddonInitializer {
     }
 
     private void relayFromTransmitter(RadioTransmitterBlockEntity tx, byte[] data, long sequence, short distance) {
-        RadioBand band = tx.getBand();
         for (RadioReceiverBlockEntity rx : RadioManager.receivers()) {
             if (!rx.isActive() || rx.getLevel() != tx.getLevel() || rx.isAM() != tx.isAM()) {
                 continue;
             }
 
-            float tuning = SignalQuality.tuningFactor(tx.getFrequency(), rx.getFrequency(), band);
-            if (tuning <= 0.0f) {
+            // Only the dominant station is relayed (FM capture / avoid AM garble).
+            // Combined quality (interference) is applied client-side via voice gain.
+            if (!rx.isDominantTransmitter(tx)) {
                 continue;
             }
-
-            double dist = Math.sqrt(tx.getBlockPos().distSqr(rx.getBlockPos()));
-            float distanceFactor = SignalQuality.distanceFactor(dist, tx.getRange(), band);
-            float quality = SignalQuality.finalQuality(distanceFactor, tuning);
-            if (quality <= 0.0f) {
+            float quality = rx.rawQualityFrom(tx);
+            if (quality <= 0.0f || SignalQuality.isSquelched(rx.getSignalQuality())) {
                 continue;
             }
 
@@ -170,7 +167,6 @@ public final class RealRadioServerAddon implements AddonInitializer {
             }
 
             // Voice loudness is applied on the client via quality sync + AlSource gain.
-            // Server simply forwards the Opus payload to the 3D static source.
             source.sendAudioFrame(data, sequence, distance);
         }
     }

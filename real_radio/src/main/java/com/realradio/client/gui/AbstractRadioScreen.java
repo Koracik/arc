@@ -15,15 +15,14 @@ public abstract class AbstractRadioScreen<T extends AbstractContainerMenu> exten
     protected static final ResourceLocation TEXTURE =
             ResourceLocation.fromNamespaceAndPath(RealRadio.MOD_ID, "textures/gui/radio.png");
 
-    /** Wide enough for Russian power labels; tall enough for spaced rows without overlap. */
-    protected static final int GUI_WIDTH = 210;
-    protected static final int GUI_HEIGHT = 180;
+    protected static final int GUI_WIDTH = 220;
+    protected static final int GUI_HEIGHT = 200;
 
     protected AbstractRadioScreen(T menu, Inventory inventory, Component title) {
         super(menu, inventory, title);
         this.imageWidth = GUI_WIDTH;
         this.imageHeight = GUI_HEIGHT;
-        this.inventoryLabelY = 10000; // hide player inv label (no slots)
+        this.inventoryLabelY = 10000;
         this.titleLabelY = 8;
         this.titleLabelX = 12;
     }
@@ -33,12 +32,14 @@ public abstract class AbstractRadioScreen<T extends AbstractContainerMenu> exten
         int x = leftPos;
         int y = topPos;
 
-        // Fallback panel if texture is missing / simple style
         graphics.blit(TEXTURE, x, y, 0, 0, imageWidth, imageHeight, 256, 256);
 
-        // Wooden bezel overlay accents
+        // Wooden bezel accents
         graphics.fill(x + 8, y + 22, x + imageWidth - 8, y + 24, 0x55C9A227);
         graphics.fill(x + 8, y + imageHeight - 12, x + imageWidth - 8, y + imageHeight - 10, 0x553A2A1A);
+
+        // Inner panel shadow for depth
+        graphics.fill(x + 10, y + 26, x + imageWidth - 10, y + 27, 0x33000000);
     }
 
     @Override
@@ -50,9 +51,20 @@ public abstract class AbstractRadioScreen<T extends AbstractContainerMenu> exten
 
     @Override
     protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        // Leave room for the LED in the top-right
         int maxTitleW = imageWidth - 36;
         String titleText = font.plainSubstrByWidth(title.getString(), maxTitleW);
-        graphics.drawString(font, titleText, titleLabelX, titleLabelY, 0xFFE8D5A3, false);
+        graphics.drawString(font, titleText, titleLabelX, titleLabelY, RadioWidgets.COL_AMBER_LIT, false);
+    }
+
+    protected void drawPowerLed(GuiGraphics graphics, boolean active) {
+        int ledColor = active ? RadioWidgets.COL_LED_ON : RadioWidgets.COL_LED_OFF;
+        int lx = leftPos + imageWidth - 18;
+        int ly = topPos + 10;
+        graphics.fill(lx - 1, ly - 1, lx + 9, ly + 9, 0xFF1A1208);
+        graphics.fill(lx, ly, lx + 8, ly + 8, ledColor);
+        if (active) {
+            // soft glow
+            graphics.fill(lx + 1, ly + 1, lx + 4, ly + 4, 0x66FFFFFF);
+        }
     }
 }

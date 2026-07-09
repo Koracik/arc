@@ -3,6 +3,7 @@ package com.realradio.common.blockentity;
 import com.realradio.common.menu.RadioTransmitterMenu;
 import com.realradio.common.registry.ModBlockEntities;
 import com.realradio.common.util.RadioBand;
+import com.realradio.config.RealRadioConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -149,9 +150,17 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     /**
      * Effective broadcast range in blocks — computed from band + frequency.
      * Lower frequencies travel farther; AM covers more ground than FM.
+     * AM gains extra reach at night ({@link RealRadioConfig#amNightMultiplier()}).
      */
     public int getRange() {
-        return getBand().rangeBlocks(frequency);
+        int base = getBand().rangeBlocks(frequency);
+        if (isAM && level != null && level.isNight()) {
+            float mult = RealRadioConfig.amNightMultiplier();
+            if (mult > 1.0f) {
+                return Math.max(1, Math.round(base * mult));
+            }
+        }
+        return base;
     }
 
     public boolean isActive() {

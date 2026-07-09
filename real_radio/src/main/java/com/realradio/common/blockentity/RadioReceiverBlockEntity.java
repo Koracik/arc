@@ -137,27 +137,74 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
             signalQuality = 0.0f;
             return;
         }
+        signalQuality = SignalQuality.combineStationQualities(collectRawQualities(), isAM);
+    }
 
-        float best = 0.0f;
+    /**
+     * Raw quality from each audible transmitter (same band, within tuning tolerance).
+     */
+    private java.util.List<Float> collectRawQualities() {
+        java.util.ArrayList<Float> qualities = new java.util.ArrayList<>();
+        if (!active || level == null) {
+            return qualities;
+        }
         RadioBand band = getBand();
         BlockPos self = getBlockPos();
-
         for (RadioTransmitterBlockEntity tx : RadioManager.transmitters()) {
-            if (!tx.isActive() || tx.getLevel() != level || tx.isAM() != isAM) {
-                continue;
-            }
-            float tuning = SignalQuality.tuningFactor(tx.getFrequency(), frequency, band);
-            if (tuning <= 0.0f) {
-                continue;
-            }
-            double dist = Math.sqrt(tx.getBlockPos().distSqr(self));
-            float distance = SignalQuality.distanceFactor(dist, tx.getRange(), band);
-            float quality = SignalQuality.finalQuality(distance, tuning);
-            if (quality > best) {
-                best = quality;
+            float q = rawQualityFrom(tx, band, self);
+            if (q > 0.0f) {
+                qualities.add(q);
             }
         }
-        signalQuality = best;
+        return qualities;
+    }
+
+    private float rawQualityFrom(RadioTransmitterBlockEntity tx, RadioBand band, BlockPos self) {
+        if (!tx.isActive() || tx.getLevel() != level || tx.isAM() != isAM) {
+            return 0.0f;
+        }
+        float tuning = SignalQuality.tuningFactor(tx.getFrequency(), frequency, band);
+        if (tuning <= 0.0f) {
+            return 0.0f;
+        }
+        double dist = Math.sqrt(tx.getBlockPos().distSqr(self));
+        float distance = SignalQuality.distanceFactor(dist, tx.getRange(), band);
+        return SignalQuality.finalQuality(distance, tuning);
+    }
+
+    /**
+     * Whether {@code tx} is the strongest station on this receiver (for voice relay / FM capture).
+     */
+    public boolean isDominantTransmitter(RadioTransmitterBlockEntity tx) {
+        if (!active || level == null || tx == null) {
+            return false;
+        }
+        RadioBand band = getBand();
+        BlockPos self = getBlockPos();
+        float candidate = rawQualityFrom(tx, band, self);
+        if (candidate <= 0.0f) {
+            return false;
+        }
+
+        float best = 0.0f;
+        RadioTransmitterBlockEntity bestTx = null;
+        for (RadioTransmitterBlockEntity other : RadioManager.transmitters()) {
+            float q = rawQualityFrom(other, band, self);
+            if (q > best) {
+                best = q;
+                bestTx = other;
+            }
+        }
+        // Only the strongest station is relayed (FM capture / clean AM)
+        return bestTx == tx;
+    }
+
+    /** Raw link quality for a single transmitter (ignores multi-station combine). */
+    public float rawQualityFrom(RadioTransmitterBlockEntity tx) {
+        if (level == null) {
+            return 0.0f;
+        }
+        return rawQualityFrom(tx, getBand(), getBlockPos());
     }
 
     private void syncQualityToNearby(ServerLevel level) {

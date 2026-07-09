@@ -9,9 +9,13 @@ Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo 
 - **AM / FM** bands with realistic frequency-based range (not player-chosen power)
   - Base range is configurable (`baseRangeBlocks`, default **2500** blocks)
   - Lower frequency → farther reach; AM covers more ground than FM
+  - AM **night boost** (`amNightMultiplier`, default 1.3)
   - Config file: `config/real_radio-common.toml`
 - **Tuning tolerance** — slight detuning still works, but voice is much quieter (sharp curve)
+- **Adjacent-channel interference** and **FM capture** when multiple stations overlap
+- **Squelch** — mutes hiss below `squelchThreshold` (default 0.08)
 - **Distance falloff** — linear for AM, cubic for FM
+- **Vintage GUI** — LCD readout, fine-tune ±, dial ticks, S-meter, ON AIR
 - **White-noise static** via Minecraft sound engine (`real_radio:radio_static`), kept quiet
 
 ## Requirements

@@ -1,5 +1,12 @@
 package com.realradio.common.util;
 
+import com.realradio.config.RealRadioConfig;
+import net.minecraft.network.chat.Component;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
 /**
  * Pure signal-quality math used by transmitter/receiver matching.
  */
@@ -10,16 +17,16 @@ public final class SignalQuality {
      */
     private static final float TUNING_CURVE_EXPONENT = 2.5f;
 
-    /** Static noise loudness scale — kept intentionally quiet so speech stays primary. */
-    private static final float STATIC_VOLUME_SCALE = 0.15f;
+    /** Max quality reduction from adjacent-channel interference. */
+    private static final float MAX_INTERFERENCE = 0.40f;
+
+    /** FM capture ratio: if best ≥ this × second, second is fully suppressed. */
+    private static final float FM_CAPTURE_RATIO = 1.5f;
 
     private SignalQuality() {
     }
 
     /**
-     * @param txFrequency transmitter frequency (band units)
-     * @param rxFrequency receiver frequency (band units)
-     * @param band        shared band (AM/FM must match)
      * @return tuning factor in [0, 1] — exact match = 1, edge of tolerance ≈ 0
      */
     public static float tuningFactor(float txFrequency, float rxFrequency, RadioBand band) {
@@ -29,13 +36,12 @@ public final class SignalQuality {
             return 0.0f;
         }
         float linear = 1.0f - (delta / tolerance);
-        // Sharp curve: half-tolerance ≈ 0.18 volume instead of 0.5
         return (float) Math.pow(linear, TUNING_CURVE_EXPONENT);
     }
 
     /**
      * @param distanceBlocks   euclidean distance transmitter ↔ receiver
-     * @param transmitterRange max TX range in blocks (from frequency / band)
+     * @param transmitterRange max TX range in blocks (from frequency / band / night)
      * @param band             AM/FM (affects falloff curve)
      * @return distance factor in [0, 1]
      */
@@ -47,10 +53,8 @@ public final class SignalQuality {
         double ratio = distanceBlocks / maxRange;
         double factor;
         if (band.isAM()) {
-            // Linear falloff — AM degrades gradually
             factor = 1.0 - ratio;
         } else {
-            // Cubic falloff — FM stays clean then drops sharply
             factor = 1.0 - (ratio * ratio * ratio);
         }
         return (float) Math.max(0.0, Math.min(1.0, factor));
@@ -61,18 +65,118 @@ public final class SignalQuality {
     }
 
     /**
-     * White-noise loudness for the Minecraft looping static sound.
-     * Quieter overall; still louder when signal quality is poor.
+     * Combines multiple raw station qualities into one reception quality.
+     * <ul>
+     *   <li>FM capture: dominant station fully wins when clearly stronger</li>
+     *   <li>Otherwise adjacent-channel interference reduces best quality</li>
+     * </ul>
      */
-    public static float staticVolume(float finalQuality, float receiverVolume) {
-        return (1.0f - finalQuality) * receiverVolume * STATIC_VOLUME_SCALE;
+    public static float combineStationQualities(List<Float> rawQualities, boolean isAM) {
+        if (rawQualities == null || rawQualities.isEmpty()) {
+            return 0.0f;
+        }
+        List<Float> sorted = new ArrayList<>(rawQualities.size());
+        for (Float q : rawQualities) {
+            if (q != null && q > 0.0f) {
+                sorted.add(q);
+            }
+        }
+        if (sorted.isEmpty()) {
+            return 0.0f;
+        }
+        sorted.sort(Comparator.reverseOrder());
+        float best = sorted.get(0);
+        if (sorted.size() == 1) {
+            return clamp01(best);
+        }
+
+        float second = sorted.get(1);
+        // FM capture effect — strong station "locks" the receiver
+        if (!isAM && second > 0.0f && best >= FM_CAPTURE_RATIO * second) {
+            return clamp01(best);
+        }
+
+        float interferenceSum = 0.0f;
+        for (int i = 1; i < sorted.size(); i++) {
+            interferenceSum += sorted.get(i) / best;
+        }
+        float reduction = Math.min(MAX_INTERFERENCE, 0.25f * interferenceSum);
+        return clamp01(best * (1.0f - reduction));
     }
 
     /**
-     * Plasmo Voice source gain for decoded speech.
-     * Scales with both receiver volume knob and signal quality (distance × tuning).
+     * Index of the strongest raw station, or -1 if empty.
+     * Used so only the dominant TX is relayed (FM capture / clean AM).
      */
+    public static int dominantStationIndex(List<Float> rawQualities) {
+        if (rawQualities == null || rawQualities.isEmpty()) {
+            return -1;
+        }
+        int bestIdx = -1;
+        float best = 0.0f;
+        for (int i = 0; i < rawQualities.size(); i++) {
+            float q = rawQualities.get(i) != null ? rawQualities.get(i) : 0.0f;
+            if (q > best) {
+                best = q;
+                bestIdx = i;
+            }
+        }
+        return best > 0.0f ? bestIdx : -1;
+    }
+
+    public static float staticVolume(float finalQuality, float receiverVolume) {
+        if (isSquelched(finalQuality)) {
+            return 0.0f;
+        }
+        float scale = RealRadioConfig.staticVolumeScale();
+        return (1.0f - finalQuality) * receiverVolume * scale;
+    }
+
     public static float voiceVolume(float finalQuality, float receiverVolume) {
+        if (isSquelched(finalQuality)) {
+            return 0.0f;
+        }
         return finalQuality * receiverVolume;
+    }
+
+    public static boolean isSquelched(float finalQuality) {
+        return finalQuality < RealRadioConfig.squelchThreshold();
+    }
+
+    public static Component qualityWord(float quality) {
+        if (quality <= 0.001f) {
+            return Component.translatable("gui.real_radio.signal_none");
+        }
+        if (quality < 0.20f) {
+            return Component.translatable("gui.real_radio.signal_weak");
+        }
+        if (quality < 0.45f) {
+            return Component.translatable("gui.real_radio.signal_fair");
+        }
+        if (quality < 0.75f) {
+            return Component.translatable("gui.real_radio.signal_good");
+        }
+        return Component.translatable("gui.real_radio.signal_excellent");
+    }
+
+    /** Color ARGB for quality word / meter fill. */
+    public static int qualityColor(float quality) {
+        if (quality <= 0.001f) {
+            return 0xFF665544;
+        }
+        if (quality < 0.20f) {
+            return 0xFFCC4433;
+        }
+        if (quality < 0.45f) {
+            return 0xFFCCAA33;
+        }
+        if (quality < 0.75f) {
+            return 0xFF66BB44;
+        }
+        return 0xFF33CC66;
+    }
+
+    private static float clamp01(float v) {
+        return Math.max(0.0f, Math.min(1.0f, v));
     }
 }

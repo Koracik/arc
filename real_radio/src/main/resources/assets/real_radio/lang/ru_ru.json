@@ -14,6 +14,13 @@
   "gui.real_radio.power_on": "Питание: ВКЛ",
   "gui.real_radio.power_off": "Питание: ВЫКЛ",
   "gui.real_radio.signal": "Сигнал: %s%%",
+  "gui.real_radio.s_meter": "S-метр",
+  "gui.real_radio.signal_none": "Нет сигнала",
+  "gui.real_radio.signal_weak": "Слабый",
+  "gui.real_radio.signal_fair": "Средний",
+  "gui.real_radio.signal_good": "Хороший",
+  "gui.real_radio.signal_excellent": "Отличный",
+  "gui.real_radio.on_air": "В ЭФИРЕ",
   "real_radio.line.radio": "Радио",
   "subtitles.real_radio.radio_static": "Шипение радио"
 }
