@@ -25,6 +25,7 @@
   "gui.real_radio.preset": "M%s",
   "gui.real_radio.preset_hint": "Left-click: load · Right-click: save",
   "gui.real_radio.spectrum_hint": "Peaks = nearby stations",
+  "gui.real_radio.realism_hint": "Tune by ear — no station assist",
   "real_radio.line.radio": "Radio",
   "subtitles.real_radio.radio_static": "Radio static"
 }

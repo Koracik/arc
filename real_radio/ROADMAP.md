@@ -43,10 +43,12 @@
 | 6 | **GUI chrome** — procedural wooden panel + grill | done |
 | 7 | **TX mic activity** — индикатор эфира | done |
 | 8 | **Soft AGC** — `enableAgc` / `agcExponent` | done |
+| 9 | **Always-on quiet hiss** while RX powered (squelch only mutes voice) | done |
+| 10 | **`realismMode`** — hide spectrum / S-meter / signal % (find by ear) | done |
 
 Конфиг (`config/real_radio-common.toml`):
 - `[range]` `baseRangeBlocks`, `amNightMultiplier`, `antennaHeightBonus`
-- `[audio]` `squelchThreshold`, `staticVolumeScale`, `enableAgc`, `agcExponent`
+- `[audio]` `squelchThreshold` (voice only), `staticVolumeScale` (default 0.05), `enableAgc`, `agcExponent`, **`realismMode`** (default true)
 - `[propagation]` `enableLineOfSight`, `losSampleStep`, `losMaxPenalty`, `fmRainFactor`, `fmThunderFactor`
 
 ---

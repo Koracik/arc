@@ -5,6 +5,7 @@ import com.realradio.common.menu.RadioReceiverMenu;
 import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.common.util.SignalQuality;
+import com.realradio.config.RealRadioConfig;
 import com.realradio.network.NearbyStationsPayload;
 import com.realradio.network.RadioPresetPayload;
 import com.realradio.network.UpdateReceiverPayload;
@@ -175,6 +176,9 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
     }
 
     private List<RadioWidgets.SpectrumMark> spectrumMarks() {
+        if (RealRadioConfig.realismMode()) {
+            return List.of();
+        }
         List<NearbyStationsPayload.StationMarker> raw = StationSpectrumCache.get(blockPos);
         List<RadioWidgets.SpectrumMark> out = new ArrayList<>(raw.size());
         for (NearbyStationsPayload.StationMarker m : raw) {
@@ -261,16 +265,24 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         String side = isAM ? "AM" : "FM";
         RadioWidgets.drawLcd(graphics, font, leftPos + 16, topPos + 30, imageWidth - 32, 28, main, side, active);
 
-        float quality = active ? menu.getSignalQuality() : 0.0f;
-        Component word = SignalQuality.qualityWord(quality);
-        String pct = Math.round(quality * 100) + "%";
-        graphics.drawString(font,
-                Component.translatable("gui.real_radio.s_meter").getString(),
-                leftPos + 16, topPos + 190, RadioWidgets.COL_AMBER_DIM, false);
-        RadioWidgets.drawSMeter(graphics, font, leftPos + 16, topPos + 200, 110, quality, word, pct);
+        boolean realism = RealRadioConfig.realismMode();
+        if (!realism) {
+            float quality = active ? menu.getSignalQuality() : 0.0f;
+            Component word = SignalQuality.qualityWord(quality);
+            String pct = Math.round(quality * 100) + "%";
+            graphics.drawString(font,
+                    Component.translatable("gui.real_radio.s_meter").getString(),
+                    leftPos + 16, topPos + 190, RadioWidgets.COL_AMBER_DIM, false);
+            RadioWidgets.drawSMeter(graphics, font, leftPos + 16, topPos + 200, 110, quality, word, pct);
 
-        graphics.drawString(font,
-                Component.translatable("gui.real_radio.spectrum_hint").getString(),
-                leftPos + 16, topPos + 64, RadioWidgets.COL_AMBER_DIM, false);
+            graphics.drawString(font,
+                    Component.translatable("gui.real_radio.spectrum_hint").getString(),
+                    leftPos + 16, topPos + 64, RadioWidgets.COL_AMBER_DIM, false);
+        } else {
+            // Realism: no station assist — only frequency and ear
+            graphics.drawString(font,
+                    Component.translatable("gui.real_radio.realism_hint").getString(),
+                    leftPos + 16, topPos + 190, RadioWidgets.COL_AMBER_DIM, false);
+        }
     }
 }

@@ -25,6 +25,7 @@
   "gui.real_radio.preset": "M%s",
   "gui.real_radio.preset_hint": "ЛКМ: загрузить · ПКМ: сохранить",
   "gui.real_radio.spectrum_hint": "Пики = соседние станции",
+  "gui.real_radio.realism_hint": "Настраивай на слух — подсказок нет",
   "real_radio.line.radio": "Радио",
   "subtitles.real_radio.radio_static": "Шипение радио"
 }

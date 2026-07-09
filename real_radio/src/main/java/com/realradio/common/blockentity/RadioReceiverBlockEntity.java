@@ -230,6 +230,15 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
     }
 
     private void syncSpectrumToNearby(ServerLevel level) {
+        // Realism mode: never reveal nearby stations to clients
+        if (com.realradio.config.RealRadioConfig.realismMode()) {
+            NearbyStationsPayload empty = new NearbyStationsPayload(getBlockPos(), List.of());
+            AABB box = new AABB(getBlockPos()).inflate(LISTENER_SYNC_RADIUS);
+            for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, box)) {
+                PacketDistributor.sendToPlayer(player, empty);
+            }
+            return;
+        }
         if (!active) {
             return;
         }

@@ -17,6 +17,7 @@ public final class RealRadioConfig {
     public static final ModConfigSpec.DoubleValue STATIC_VOLUME_SCALE;
     public static final ModConfigSpec.BooleanValue ENABLE_AGC;
     public static final ModConfigSpec.DoubleValue AGC_EXPONENT;
+    public static final ModConfigSpec.BooleanValue REALISM_MODE;
 
     public static final ModConfigSpec.BooleanValue ENABLE_LINE_OF_SIGHT;
     public static final ModConfigSpec.IntValue LOS_SAMPLE_STEP;
@@ -51,12 +52,18 @@ public final class RealRadioConfig {
         BUILDER.comment("Real Radio — audio / reception").push("audio");
 
         SQUELCH_THRESHOLD = BUILDER
-                .comment("Mute static/voice when quality below this (0–1).")
+                .comment(
+                        "Mute VOICE only when quality below this (0–1).",
+                        "Static hiss always plays while the receiver is powered (like a real radio)."
+                )
                 .defineInRange("squelchThreshold", 0.08, 0.0, 1.0);
 
         STATIC_VOLUME_SCALE = BUILDER
-                .comment("White-noise loudness scale.")
-                .defineInRange("staticVolumeScale", 0.15, 0.0, 1.0);
+                .comment(
+                        "White-noise loudness scale (keep low). Hiss is continuous while powered;",
+                        "quieter when a station is locked. Default 0.05."
+                )
+                .defineInRange("staticVolumeScale", 0.05, 0.0, 1.0);
 
         ENABLE_AGC = BUILDER
                 .comment("Soft AGC: slightly lifts weak but above-squelch voice.")
@@ -65,6 +72,13 @@ public final class RealRadioConfig {
         AGC_EXPONENT = BUILDER
                 .comment("AGC curve exponent (<1 lifts weak signals). Default 0.85.")
                 .defineInRange("agcExponent", 0.85, 0.5, 1.0);
+
+        REALISM_MODE = BUILDER
+                .comment(
+                        "Realism mode: hide spectrum peaks, S-meter, signal %, station markers.",
+                        "Player must find stations by ear only (recommended for immersion)."
+                )
+                .define("realismMode", true);
 
         BUILDER.pop();
 
@@ -133,13 +147,22 @@ public final class RealRadioConfig {
         try {
             return STATIC_VOLUME_SCALE.get().floatValue();
         } catch (Exception e) {
-            return 0.15f;
+            return 0.05f;
         }
     }
 
     public static boolean enableAgc() {
         try {
             return ENABLE_AGC.get();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    /** Hide station assist UI (spectrum, S-meter quality) — find stations by ear. */
+    public static boolean realismMode() {
+        try {
+            return REALISM_MODE.get();
         } catch (Exception e) {
             return true;
         }

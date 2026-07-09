@@ -124,15 +124,21 @@ public final class SignalQuality {
         return best > 0.0f ? bestIdx : -1;
     }
 
+    /**
+     * White-noise for a powered receiver. Always present like a real radio:
+     * loudest on empty band, fades as signal locks. Not affected by voice squelch.
+     */
     public static float staticVolume(float finalQuality, float receiverVolume) {
-        if (isSquelched(finalQuality)) {
-            return 0.0f;
-        }
         float scale = RealRadioConfig.staticVolumeScale();
-        return (1.0f - finalQuality) * receiverVolume * scale;
+        float q = clamp01(finalQuality);
+        // Empty band → full hiss; perfect lock → near silence (tiny residual floor)
+        float residual = 0.04f;
+        float hiss = residual + (1.0f - residual) * (1.0f - q);
+        return hiss * receiverVolume * scale;
     }
 
     public static float voiceVolume(float finalQuality, float receiverVolume) {
+        // Squelch only mutes speech, never the carrier hiss
         if (isSquelched(finalQuality)) {
             return 0.0f;
         }
