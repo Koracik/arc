@@ -1,6 +1,7 @@
 package com.realradio.integration.plasmovoice;
 
 import com.realradio.RealRadio;
+import com.realradio.common.blockentity.RadioManager;
 import com.realradio.common.blockentity.RadioReceiverBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -14,14 +15,14 @@ import su.plo.voice.api.server.audio.line.ServerSourceLine;
 import su.plo.voice.api.server.audio.source.ServerStaticSource;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Owns {@link ServerStaticSource} instances for active radio receivers.
+ * Keys include dimension so same coords in different worlds do not collide.
  */
 public final class RadioVoiceService {
-    private static final Map<BlockPos, ServerStaticSource> SOURCES = new ConcurrentHashMap<>();
+    private static final Map<RadioManager.DimPos, ServerStaticSource> SOURCES = new ConcurrentHashMap<>();
 
     private static PlasmoVoiceServer voiceServer;
     private static ServerSourceLine radioLine;
@@ -54,7 +55,10 @@ public final class RadioVoiceService {
     }
 
     public static ServerStaticSource getSource(RadioReceiverBlockEntity receiver) {
-        return SOURCES.get(receiver.getBlockPos());
+        if (receiver.getLevel() == null) {
+            return null;
+        }
+        return SOURCES.get(RadioManager.DimPos.of(receiver.getLevel(), receiver.getBlockPos()));
     }
 
     public static ServerStaticSource createSource(RadioReceiverBlockEntity receiver) {
@@ -66,12 +70,13 @@ public final class RadioVoiceService {
             return null;
         }
 
-        BlockPos pos = receiver.getBlockPos();
-        ServerStaticSource existing = SOURCES.get(pos);
+        RadioManager.DimPos key = RadioManager.DimPos.of(level, receiver.getBlockPos());
+        ServerStaticSource existing = SOURCES.get(key);
         if (existing != null) {
             return existing;
         }
 
+        BlockPos pos = receiver.getBlockPos();
         try {
             McServerLib mc = voiceServer.getMinecraftServer();
             McServerWorld world = mc.getWorld(serverLevel);
@@ -85,7 +90,7 @@ public final class RadioVoiceService {
             ServerStaticSource source = radioLine.createStaticSource(sourcePos, false);
             source.setIconVisible(false);
             source.setName("Radio");
-            SOURCES.put(pos.immutable(), source);
+            SOURCES.put(key, source);
             return source;
         } catch (Throwable t) {
             RealRadio.LOGGER.error("Failed to create Plasmo static source at {}", pos, t);
@@ -94,7 +99,10 @@ public final class RadioVoiceService {
     }
 
     public static void removeSource(RadioReceiverBlockEntity receiver) {
-        ServerStaticSource source = SOURCES.remove(receiver.getBlockPos());
+        if (receiver.getLevel() == null) {
+            return;
+        }
+        ServerStaticSource source = SOURCES.remove(RadioManager.DimPos.of(receiver.getLevel(), receiver.getBlockPos()));
         if (source != null) {
             try {
                 source.remove();
@@ -105,14 +113,13 @@ public final class RadioVoiceService {
     }
 
     /**
-     * Static source near a player for handheld RX (position fixed at create; good enough for short range).
+     * Static source near a player for handheld RX.
      */
     public static ServerStaticSource createPlayerSource(ServerPlayer player) {
         if (!isReady() || player == null) {
             return null;
         }
         ServerLevel serverLevel = player.serverLevel();
-        BlockPos pos = player.blockPosition();
         try {
             McServerLib mc = voiceServer.getMinecraftServer();
             McServerWorld world = mc.getWorld(serverLevel);

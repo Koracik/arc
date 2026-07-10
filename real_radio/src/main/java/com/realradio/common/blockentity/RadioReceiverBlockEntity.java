@@ -7,6 +7,7 @@ import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.common.util.RadioPropagation;
 import com.realradio.common.util.SignalQuality;
+import com.realradio.config.RealRadioConfig;
 import com.realradio.integration.plasmovoice.RadioVoiceService;
 import com.realradio.network.NearbyStationsPayload;
 import com.realradio.network.ReceiverQualityPayload;
@@ -36,6 +37,9 @@ import java.util.List;
 
 /**
  * Plays received radio audio as a Plasmo Voice 3D static source at this block.
+ * <p>
+ * Quality / spectrum / network sync are throttled — heavy LOS work is NOT done
+ * on every voice frame (see {@link #acceptsFrom(BlockPos)}).
  */
 public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvider {
     private static final int DATA_FREQUENCY_BITS = 0;
@@ -47,6 +51,12 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
     private static final int DATA_COUNT = 6;
 
     public static final double LISTENER_SYNC_RADIUS = 32.0;
+    /** Full quality recompute interval (ticks). */
+    private static final int QUALITY_INTERVAL = 5;
+    /** Client quality packet interval (ticks). */
+    private static final int QUALITY_SYNC_INTERVAL = 5;
+    /** Spectrum packet interval (ticks). */
+    private static final int SPECTRUM_INTERVAL = 20;
 
     private float frequency = RadioBand.FM.defaultFrequency();
     private boolean isAM;
@@ -56,7 +66,17 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
     private int channelKey = ChannelKeys.OPEN;
     private boolean recording;
     private final ChannelPresets presets = new ChannelPresets();
-    private int spectrumTickCounter;
+    private int tickCounter;
+    private boolean voiceSourceReady;
+    private boolean cleanedUp;
+
+    /** Best TX/relay position from last quality pass — used by voice path without re-raycasting. */
+    @Nullable
+    private BlockPos dominantSourcePos;
+    private float lastSyncedQuality = Float.NaN;
+    private float lastSyncedVoice;
+    private float lastSyncedStatic;
+    private boolean lastSyncedActive;
 
     private final ContainerData dataAccess = new ContainerData() {
         @Override
@@ -100,11 +120,37 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         if (!(level instanceof ServerLevel serverLevel)) {
             return;
         }
-        be.recalculateQuality();
-        be.ensureVoiceSource();
-        be.syncQualityToNearby(serverLevel);
-        be.spectrumTickCounter++;
-        if (be.spectrumTickCounter % 10 == 0) {
+        be.tickCounter++;
+
+        if (!be.active) {
+            if (be.signalQuality != 0.0f || be.dominantSourcePos != null) {
+                be.signalQuality = 0.0f;
+                be.dominantSourcePos = null;
+            }
+            if (be.voiceSourceReady) {
+                RadioVoiceService.removeSource(be);
+                be.voiceSourceReady = false;
+            }
+            // Rare offline sync so clients clear static
+            if (be.tickCounter % QUALITY_SYNC_INTERVAL == 0) {
+                be.syncQualityToNearby(serverLevel, false);
+            }
+            return;
+        }
+
+        if (be.tickCounter % QUALITY_INTERVAL == 0) {
+            be.recalculateQuality();
+        }
+
+        if (!be.voiceSourceReady) {
+            be.voiceSourceReady = RadioVoiceService.createSource(be) != null;
+        }
+
+        if (be.tickCounter % QUALITY_SYNC_INTERVAL == 0) {
+            be.syncQualityToNearby(serverLevel, true);
+        }
+
+        if (be.tickCounter % SPECTRUM_INTERVAL == 0) {
             be.syncSpectrumToNearby(serverLevel);
         }
     }
@@ -117,70 +163,96 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         super.onLoad();
         if (level != null && !level.isClientSide) {
             RadioManager.registerReceiver(this);
+            cleanedUp = false;
             if (active) {
-                RadioVoiceService.createSource(this);
+                voiceSourceReady = RadioVoiceService.createSource(this) != null;
             }
         }
     }
 
     @Override
     public void setRemoved() {
-        if (level != null && !level.isClientSide) {
-            RadioManager.unregisterReceiver(this);
-            RadioVoiceService.removeSource(this);
-        }
+        cleanupServer();
         super.setRemoved();
     }
 
     public void onRemoved() {
-        if (level != null && !level.isClientSide) {
-            if (recording) {
-                com.realradio.common.util.AirRecording.finish(this);
-            }
-            RadioManager.unregisterReceiver(this);
-            RadioVoiceService.removeSource(this);
-        }
+        cleanupServer();
     }
 
-    private void ensureVoiceSource() {
-        if (active) {
-            RadioVoiceService.createSource(this);
-        } else {
-            RadioVoiceService.removeSource(this);
+    private void cleanupServer() {
+        if (cleanedUp || level == null || level.isClientSide) {
+            return;
         }
+        cleanedUp = true;
+        if (recording) {
+            com.realradio.common.util.AirRecording.finish(this);
+        }
+        RadioManager.unregisterReceiver(this);
+        RadioVoiceService.removeSource(this);
+        voiceSourceReady = false;
+    }
+
+    /**
+     * Voice-path gate: true if this source won the last quality pass (no LOS recompute).
+     */
+    public boolean acceptsFrom(BlockPos sourcePos) {
+        if (!active || sourcePos == null || dominantSourcePos == null) {
+            return false;
+        }
+        if (SignalQuality.isSquelched(signalQuality)) {
+            return false;
+        }
+        return dominantSourcePos.equals(sourcePos);
+    }
+
+    public boolean isVoiceOpen() {
+        return active && signalQuality > 0.0f && !SignalQuality.isSquelched(signalQuality);
     }
 
     private void recalculateQuality() {
         if (!active || level == null) {
             signalQuality = 0.0f;
+            dominantSourcePos = null;
             return;
         }
-        signalQuality = SignalQuality.combineStationQualities(collectRawQualities(), isAM);
-    }
 
-    private List<Float> collectRawQualities() {
-        ArrayList<Float> qualities = new ArrayList<>();
-        if (!active || level == null) {
-            return qualities;
-        }
+        float best = 0.0f;
+        BlockPos bestPos = null;
+        ArrayList<Float> qualities = new ArrayList<>(8);
         RadioBand band = getBand();
         BlockPos self = getBlockPos();
+        // Antenna mast scanned once per quality pass
+        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
+        float weather = RadioPropagation.weatherFactor(level, isAM);
+
         for (RadioTransmitterBlockEntity tx : RadioManager.transmitters()) {
-            float q = rawQualityFrom(tx, band, self);
+            float q = rawQualityFrom(tx, band, self, rxAntenna, weather);
             if (q > 0.0f) {
                 qualities.add(q);
+                if (q > best) {
+                    best = q;
+                    bestPos = tx.getBlockPos().immutable();
+                }
             }
         }
         for (RadioRelayBlockEntity relay : RadioManager.relays()) {
-            float q = rawQualityFromRelay(relay, band, self);
+            float q = rawQualityFromRelay(relay, band, self, rxAntenna, weather);
             if (q > 0.0f) {
                 qualities.add(q);
+                if (q > best) {
+                    best = q;
+                    bestPos = relay.getBlockPos().immutable();
+                }
             }
         }
-        return qualities;
+
+        signalQuality = SignalQuality.combineStationQualities(qualities, isAM);
+        dominantSourcePos = bestPos;
     }
 
-    private float rawQualityFromRelay(RadioRelayBlockEntity relay, RadioBand band, BlockPos self) {
+    private float rawQualityFromRelay(RadioRelayBlockEntity relay, RadioBand band, BlockPos self,
+                                      float rxAntenna, float weather) {
         if (!relay.isActive() || relay.getLevel() != level || relay.isOutAM() != isAM) {
             return 0.0f;
         }
@@ -191,18 +263,22 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         if (tuning <= 0.0f) {
             return 0.0f;
         }
-        double dist = Math.sqrt(relay.getBlockPos().distSqr(self));
-        float distance = SignalQuality.distanceFactor(dist, relay.getOutRange(), band);
+        int range = relay.getOutRange();
+        double distSq = relay.getBlockPos().distSqr(self);
+        if (distSq >= (double) range * (double) range) {
+            return 0.0f;
+        }
+        double dist = Math.sqrt(distSq);
+        float distance = SignalQuality.distanceFactor(dist, range, band);
         if (distance <= 0.0f) {
             return 0.0f;
         }
         float los = RadioPropagation.lineOfSightFactor(level, relay.getBlockPos(), self, isAM);
-        float weather = RadioPropagation.weatherFactor(level, isAM);
-        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
         return SignalQuality.finalQuality(distance * los * weather * rxAntenna, tuning);
     }
 
-    private float rawQualityFrom(RadioTransmitterBlockEntity tx, RadioBand band, BlockPos self) {
+    private float rawQualityFrom(RadioTransmitterBlockEntity tx, RadioBand band, BlockPos self,
+                                 float rxAntenna, float weather) {
         if (!tx.isActive() || tx.getLevel() != level || tx.isAM() != isAM) {
             return 0.0f;
         }
@@ -213,17 +289,18 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         if (tuning <= 0.0f) {
             return 0.0f;
         }
-        double dist = Math.sqrt(tx.getBlockPos().distSqr(self));
-        float distance = SignalQuality.distanceFactor(dist, tx.getRange(), band);
+        int range = tx.getRange();
+        double distSq = tx.getBlockPos().distSqr(self);
+        if (distSq >= (double) range * (double) range) {
+            return 0.0f;
+        }
+        double dist = Math.sqrt(distSq);
+        float distance = SignalQuality.distanceFactor(dist, range, band);
         if (distance <= 0.0f) {
             return 0.0f;
         }
-
         float los = RadioPropagation.lineOfSightFactor(level, tx.getBlockPos(), self, isAM);
-        float weather = RadioPropagation.weatherFactor(level, isAM);
-        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
-        float env = los * weather * rxAntenna;
-        return SignalQuality.finalQuality(distance * env, tuning);
+        return SignalQuality.finalQuality(distance * los * weather * rxAntenna, tuning);
     }
 
     public int getAntennaRodCount() {
@@ -233,75 +310,71 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         return RadioPropagation.countAntennaRods(level, getBlockPos());
     }
 
+    /** @deprecated prefer {@link #acceptsFrom(BlockPos)} on the hot voice path */
+    @Deprecated
     public boolean isDominantTransmitter(RadioTransmitterBlockEntity tx) {
-        if (!active || level == null || tx == null) {
-            return false;
-        }
-        RadioBand band = getBand();
-        BlockPos self = getBlockPos();
-        float candidate = rawQualityFrom(tx, band, self);
-        if (candidate <= 0.0f) {
-            return false;
-        }
-
-        float best = 0.0f;
-        RadioTransmitterBlockEntity bestTx = null;
-        for (RadioTransmitterBlockEntity other : RadioManager.transmitters()) {
-            float q = rawQualityFrom(other, band, self);
-            if (q > best) {
-                best = q;
-                bestTx = other;
-            }
-        }
-        return bestTx == tx;
+        return tx != null && acceptsFrom(tx.getBlockPos());
     }
 
     public float rawQualityFrom(RadioTransmitterBlockEntity tx) {
-        if (level == null) {
+        if (level == null || tx == null) {
             return 0.0f;
         }
-        return rawQualityFrom(tx, getBand(), getBlockPos());
+        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, getBlockPos());
+        float weather = RadioPropagation.weatherFactor(level, isAM);
+        return rawQualityFrom(tx, getBand(), getBlockPos(), rxAntenna, weather);
     }
 
-    private void syncQualityToNearby(ServerLevel level) {
+    private void syncQualityToNearby(ServerLevel level, boolean ignore) {
         AABB box = new AABB(getBlockPos()).inflate(LISTENER_SYNC_RADIUS);
+        List<ServerPlayer> players = level.getEntitiesOfClass(ServerPlayer.class, box);
+        if (players.isEmpty()) {
+            return;
+        }
+
         float voiceVol = SignalQuality.voiceVolume(signalQuality, volume);
         float staticVol = active ? SignalQuality.staticVolume(signalQuality, volume) : 0.0f;
+
+        // Skip only when nothing meaningful changed (still throttled by QUALITY_SYNC_INTERVAL)
+        if (active == lastSyncedActive
+                && Math.abs(signalQuality - lastSyncedQuality) < 0.02f
+                && Math.abs(voiceVol - lastSyncedVoice) < 0.02f
+                && Math.abs(staticVol - lastSyncedStatic) < 0.02f) {
+            return;
+        }
 
         ReceiverQualityPayload payload = new ReceiverQualityPayload(
                 getBlockPos(), signalQuality, voiceVol, staticVol, active
         );
-
-        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, box)) {
+        for (ServerPlayer player : players) {
             PacketDistributor.sendToPlayer(player, payload);
         }
+        lastSyncedQuality = signalQuality;
+        lastSyncedVoice = voiceVol;
+        lastSyncedStatic = staticVol;
+        lastSyncedActive = active;
     }
 
     private void syncSpectrumToNearby(ServerLevel level) {
-        // Realism mode: never reveal nearby stations to clients
-        if (com.realradio.config.RealRadioConfig.realismMode()) {
-            NearbyStationsPayload empty = new NearbyStationsPayload(getBlockPos(), List.of());
-            AABB box = new AABB(getBlockPos()).inflate(LISTENER_SYNC_RADIUS);
-            for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, box)) {
-                PacketDistributor.sendToPlayer(player, empty);
-            }
+        // Realism: never send assist data (was spamming empty packets every few ticks)
+        if (RealRadioConfig.realismMode()) {
             return;
         }
         if (!active) {
             return;
         }
+        AABB box = new AABB(getBlockPos()).inflate(LISTENER_SYNC_RADIUS);
+        List<ServerPlayer> players = level.getEntitiesOfClass(ServerPlayer.class, box);
+        if (players.isEmpty()) {
+            return;
+        }
         List<NearbyStationsPayload.StationMarker> markers = buildSpectrumMarkers();
         NearbyStationsPayload payload = new NearbyStationsPayload(getBlockPos(), markers);
-        AABB box = new AABB(getBlockPos()).inflate(LISTENER_SYNC_RADIUS);
-        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, box)) {
+        for (ServerPlayer player : players) {
             PacketDistributor.sendToPlayer(player, payload);
         }
     }
 
-    /**
-     * All active TX on the same band within theoretical max range, for dial ticks.
-     * Strength is normalized raw quality as if RX were tuned exactly to that TX.
-     */
     private List<NearbyStationsPayload.StationMarker> buildSpectrumMarkers() {
         List<NearbyStationsPayload.StationMarker> out = new ArrayList<>();
         if (level == null) {
@@ -309,6 +382,8 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         }
         RadioBand band = getBand();
         BlockPos self = getBlockPos();
+        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
+        float weather = RadioPropagation.weatherFactor(level, isAM);
         for (RadioTransmitterBlockEntity tx : RadioManager.transmitters()) {
             if (!tx.isActive() || tx.getLevel() != level || tx.isAM() != isAM) {
                 continue;
@@ -316,17 +391,18 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
             if (!ChannelKeys.matches(tx.getChannelKey(), channelKey)) {
                 continue;
             }
-            // Perfect tuning hypothetical for spectrum peak height
-            float perfectTuning = 1.0f;
-            double dist = Math.sqrt(tx.getBlockPos().distSqr(self));
-            float distance = SignalQuality.distanceFactor(dist, tx.getRange(), band);
+            int range = tx.getRange();
+            double distSq = tx.getBlockPos().distSqr(self);
+            if (distSq >= (double) range * (double) range) {
+                continue;
+            }
+            double dist = Math.sqrt(distSq);
+            float distance = SignalQuality.distanceFactor(dist, range, band);
             if (distance <= 0.0f) {
                 continue;
             }
             float los = RadioPropagation.lineOfSightFactor(level, tx.getBlockPos(), self, isAM);
-            float weather = RadioPropagation.weatherFactor(level, isAM);
-            float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
-            float strength = SignalQuality.finalQuality(distance * los * weather * rxAntenna, perfectTuning);
+            float strength = SignalQuality.finalQuality(distance * los * weather * rxAntenna, 1.0f);
             if (strength > 0.02f) {
                 out.add(new NearbyStationsPayload.StationMarker(tx.getFrequency(), strength));
             }
@@ -379,7 +455,17 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
 
     public void setActive(boolean active) {
         this.active = active;
-        ensureVoiceSource();
+        if (!active) {
+            this.recording = false;
+            this.dominantSourcePos = null;
+            this.signalQuality = 0.0f;
+            if (level != null && !level.isClientSide) {
+                RadioVoiceService.removeSource(this);
+                voiceSourceReady = false;
+            }
+        } else if (level != null && !level.isClientSide) {
+            voiceSourceReady = RadioVoiceService.createSource(this) != null;
+        }
         setChangedAndSync();
     }
 
@@ -431,12 +517,22 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         this.isAM = isAM;
         this.frequency = getBand().snap(frequency);
         this.volume = Math.max(0.0f, Math.min(1.0f, volume));
+        boolean wasActive = this.active;
         this.active = active;
         this.channelKey = ChannelKeys.clamp(channelKey);
         if (!active) {
             this.recording = false;
+            this.dominantSourcePos = null;
+            this.signalQuality = 0.0f;
         }
-        ensureVoiceSource();
+        if (level != null && !level.isClientSide) {
+            if (active && !wasActive) {
+                voiceSourceReady = RadioVoiceService.createSource(this) != null;
+            } else if (!active && wasActive) {
+                RadioVoiceService.removeSource(this);
+                voiceSourceReady = false;
+            }
+        }
         setChangedAndSync();
     }
 
@@ -446,6 +542,8 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
 
     private void setChangedAndSync() {
         setChanged();
+        // Invalidate quality packet cache so clients get fresh volumes after GUI change
+        lastSyncedQuality = Float.NaN;
         if (level instanceof ServerLevel serverLevel) {
             BlockState state = getBlockState();
             serverLevel.sendBlockUpdated(worldPosition, state, state, 3);

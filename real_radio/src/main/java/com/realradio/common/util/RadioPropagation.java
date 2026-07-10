@@ -204,11 +204,9 @@ public final class RadioPropagation {
             }
             BlockState state = level.getBlockState(p);
             total++;
-            if (state.isSolidRender(level, p) || state.canOcclude()) {
-                // Count full cubes / occluding blocks as obstruction
-                if (!state.getCollisionShape(level, p).isEmpty()) {
-                    solid++;
-                }
+            // Avoid getCollisionShape (allocates VoxelShape) — canOcclude is enough for FM fade
+            if (!state.isAir() && (state.canOcclude() || state.isSolidRender(level, p))) {
+                solid++;
             }
         }
 

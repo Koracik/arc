@@ -48,6 +48,10 @@ public class RadioRelayBlockEntity extends BlockEntity implements MenuProvider {
     private int inChannelKey = ChannelKeys.OPEN;
     private int outChannelKey = ChannelKeys.OPEN;
     private long lastSpeakMs;
+    private int cachedOutRange = -1;
+    private long cachedOutRangeGameTime = Long.MIN_VALUE;
+    private static final int RANGE_CACHE_TICKS = 20;
+    private boolean cleanedUp;
 
     private final ContainerData dataAccess = new ContainerData() {
         @Override
@@ -104,16 +108,20 @@ public class RadioRelayBlockEntity extends BlockEntity implements MenuProvider {
 
     @Override
     public void setRemoved() {
-        if (level != null && !level.isClientSide) {
-            RadioManager.unregisterRelay(this);
-        }
+        cleanupServer();
         super.setRemoved();
     }
 
     public void onRemoved() {
-        if (level != null && !level.isClientSide) {
-            RadioManager.unregisterRelay(this);
+        cleanupServer();
+    }
+
+    private void cleanupServer() {
+        if (cleanedUp || level == null || level.isClientSide) {
+            return;
         }
+        cleanedUp = true;
+        RadioManager.unregisterRelay(this);
     }
 
     public void markSpeaking() {
@@ -161,6 +169,10 @@ public class RadioRelayBlockEntity extends BlockEntity implements MenuProvider {
     }
 
     public int getOutRange() {
+        long gameTime = level != null ? level.getGameTime() : 0L;
+        if (cachedOutRange > 0 && gameTime - cachedOutRangeGameTime < RANGE_CACHE_TICKS) {
+            return cachedOutRange;
+        }
         int base = getOutBand().rangeBlocks(outFrequency);
         float mult = level != null
                 ? RadioPropagation.fullAntennaMultiplier(level, getBlockPos())
@@ -168,7 +180,9 @@ public class RadioRelayBlockEntity extends BlockEntity implements MenuProvider {
         if (outAM && level != null && level.isNight()) {
             mult *= RealRadioConfig.amNightMultiplier();
         }
-        return Math.max(1, Math.round(base * mult));
+        cachedOutRange = Math.max(1, Math.round(base * mult));
+        cachedOutRangeGameTime = gameTime;
+        return cachedOutRange;
     }
 
     public int getAntennaRodCount() {
@@ -191,6 +205,8 @@ public class RadioRelayBlockEntity extends BlockEntity implements MenuProvider {
         this.active = active;
         this.inChannelKey = ChannelKeys.clamp(inKey);
         this.outChannelKey = ChannelKeys.clamp(outKey);
+        cachedOutRange = -1;
+        cachedOutRangeGameTime = Long.MIN_VALUE;
         setChangedAndSync();
     }
 

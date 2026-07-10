@@ -48,6 +48,11 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     private int channelKey = ChannelKeys.OPEN;
     private long lastSpeakMs;
     private final ChannelPresets presets = new ChannelPresets();
+    /** Cached range (antenna scan is not free). */
+    private int cachedRange = -1;
+    private long cachedRangeGameTime = Long.MIN_VALUE;
+    private static final int RANGE_CACHE_TICKS = 20;
+    private boolean cleanedUp;
 
     private final ContainerData dataAccess = new ContainerData() {
         @Override
@@ -103,16 +108,20 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
 
     @Override
     public void setRemoved() {
-        if (level != null && !level.isClientSide) {
-            RadioManager.unregisterTransmitter(this);
-        }
+        cleanupServer();
         super.setRemoved();
     }
 
     public void onRemoved() {
-        if (level != null && !level.isClientSide) {
-            RadioManager.unregisterTransmitter(this);
+        cleanupServer();
+    }
+
+    private void cleanupServer() {
+        if (cleanedUp || level == null || level.isClientSide) {
+            return;
         }
+        cleanedUp = true;
+        RadioManager.unregisterTransmitter(this);
     }
 
     public boolean isPlayerInCaptureZone(Vec3 playerPos) {
@@ -145,6 +154,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
 
     public void setFrequency(float frequency) {
         this.frequency = getBand().snap(frequency);
+        invalidateRangeCache();
         setChangedAndSync();
     }
 
@@ -158,6 +168,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         }
         this.isAM = am;
         this.frequency = getBand().defaultFrequency();
+        invalidateRangeCache();
         setChangedAndSync();
     }
 
@@ -167,8 +178,13 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
 
     /**
      * Effective broadcast range: band × frequency × night (AM) × height × copper lightning-rod mast.
+     * Result is cached for {@link #RANGE_CACHE_TICKS} to avoid re-scanning the mast every call.
      */
     public int getRange() {
+        long gameTime = level != null ? level.getGameTime() : 0L;
+        if (cachedRange > 0 && gameTime - cachedRangeGameTime < RANGE_CACHE_TICKS) {
+            return cachedRange;
+        }
         int base = getBand().rangeBlocks(frequency);
         float mult = level != null
                 ? RadioPropagation.fullAntennaMultiplier(level, getBlockPos())
@@ -176,7 +192,14 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         if (isAM && level != null && level.isNight()) {
             mult *= RealRadioConfig.amNightMultiplier();
         }
-        return Math.max(1, Math.round(base * mult));
+        cachedRange = Math.max(1, Math.round(base * mult));
+        cachedRangeGameTime = gameTime;
+        return cachedRange;
+    }
+
+    private void invalidateRangeCache() {
+        cachedRange = -1;
+        cachedRangeGameTime = Long.MIN_VALUE;
     }
 
     /** Copper lightning rods counted as the antenna mast above this transmitter. */
@@ -232,6 +255,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         this.frequency = getBand().snap(frequency);
         this.active = active;
         this.channelKey = ChannelKeys.clamp(channelKey);
+        invalidateRangeCache();
         setChangedAndSync();
     }
 

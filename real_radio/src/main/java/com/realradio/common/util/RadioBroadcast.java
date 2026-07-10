@@ -15,20 +15,20 @@ import java.util.Set;
 
 /**
  * Shared TX → RX / relay broadcast path with hop limiting and channel keys.
+ * <p>
+ * Hot path (every Opus frame): cheap distance/key checks + cached dominant source
+ * on receivers. Full LOS math runs on the RX quality tick only.
  */
 public final class RadioBroadcast {
     private RadioBroadcast() {
     }
 
-    /**
-     * Broadcast Opus frames from a physical transmitter block.
-     */
     public static void fromTransmitter(RadioTransmitterBlockEntity tx, byte[] data, long sequence,
                                        short hearDistance, boolean stereo) {
         if (tx == null || !tx.isActive() || tx.getLevel() == null) {
             return;
         }
-        Set<RadioManager.DimPos> visited = new HashSet<>();
+        Set<RadioManager.DimPos> visited = new HashSet<>(4);
         visited.add(RadioManager.DimPos.of(tx.getLevel(), tx.getBlockPos()));
         broadcast(
                 tx.getLevel(),
@@ -46,9 +46,6 @@ public final class RadioBroadcast {
         );
     }
 
-    /**
-     * Broadcast from a virtual source (handheld TX, tape playback, relay out).
-     */
     public static void broadcast(
             Level level,
             BlockPos sourcePos,
@@ -63,12 +60,13 @@ public final class RadioBroadcast {
             int hop,
             Set<RadioManager.DimPos> visited
     ) {
-        if (level == null || data == null || data.length == 0 || rangeBlocks <= 0) {
+        if (level == null || data == null || data.length == 0 || rangeBlocks <= 0 || sourcePos == null) {
             return;
         }
+
+        double rangeSq = (double) rangeBlocks * (double) rangeBlocks;
         RadioBand band = RadioBand.fromAm(isAM);
 
-        // Deliver to block receivers
         for (RadioReceiverBlockEntity rx : RadioManager.receivers()) {
             if (!rx.isActive() || rx.getLevel() != level || rx.isAM() != isAM) {
                 continue;
@@ -76,14 +74,12 @@ public final class RadioBroadcast {
             if (!ChannelKeys.matches(channelKey, rx.getChannelKey())) {
                 continue;
             }
-            float quality = qualityToReceiver(level, sourcePos, frequency, isAM, channelKey, rangeBlocks, rx);
-            if (quality <= 0.0f) {
+            // Cheap cull before any quality math
+            if (sourcePos.distSqr(rx.getBlockPos()) >= rangeSq) {
                 continue;
             }
-            if (!isDominantForReceiver(level, sourcePos, frequency, isAM, channelKey, rangeBlocks, rx, quality)) {
-                continue;
-            }
-            if (SignalQuality.isSquelched(rx.getSignalQuality())) {
+            // Dominant was decided on the quality tick — no LOS re-scan per frame
+            if (!rx.acceptsFrom(sourcePos)) {
                 continue;
             }
             deliverToReceiver(rx, data, sequence, hearDistance, stereo);
@@ -92,7 +88,6 @@ public final class RadioBroadcast {
             }
         }
 
-        // Handheld virtual receivers
         HandheldRadioService.deliverToHandhelds(
                 level, sourcePos, frequency, isAM, channelKey, rangeBlocks,
                 data, sequence, hearDistance, stereo
@@ -103,7 +98,6 @@ public final class RadioBroadcast {
             return;
         }
 
-        // Feed relays (RX side) and retransmit on out channel
         for (RadioRelayBlockEntity relay : RadioManager.relays()) {
             if (!relay.isActive() || relay.getLevel() != level) {
                 continue;
@@ -118,11 +112,11 @@ public final class RadioBroadcast {
             if (!ChannelKeys.matches(channelKey, relay.getInChannelKey())) {
                 continue;
             }
-            float q = qualityToRelayIn(level, sourcePos, frequency, isAM, channelKey, rangeBlocks, relay);
-            if (q <= 0.0f || SignalQuality.isSquelched(q)) {
+            if (sourcePos.distSqr(relay.getBlockPos()) >= rangeSq) {
                 continue;
             }
-            if (!isDominantForRelay(level, sourcePos, frequency, isAM, channelKey, rangeBlocks, relay, q)) {
+            // Cheap tuning + distance only on hot path; full LOS only if link looks viable
+            if (!relayCanHear(level, sourcePos, frequency, isAM, rangeBlocks, band, relay)) {
                 continue;
             }
 
@@ -146,6 +140,27 @@ public final class RadioBroadcast {
         }
     }
 
+    /**
+     * Relay ingress check: tuning + distance first; LOS only if within range and tuned.
+     * Skips the O(all TX) dominant scan that used to run every audio frame.
+     */
+    private static boolean relayCanHear(Level level, BlockPos sourcePos, float frequency, boolean isAM,
+                                        int rangeBlocks, RadioBand band, RadioRelayBlockEntity relay) {
+        float tuning = SignalQuality.tuningFactor(frequency, relay.getInFrequency(), band);
+        if (tuning <= 0.0f) {
+            return false;
+        }
+        double dist = Math.sqrt(sourcePos.distSqr(relay.getBlockPos()));
+        float distance = SignalQuality.distanceFactor(dist, rangeBlocks, band);
+        if (distance <= 0.0f) {
+            return false;
+        }
+        float los = RadioPropagation.lineOfSightFactor(level, sourcePos, relay.getBlockPos(), isAM);
+        float weather = RadioPropagation.weatherFactor(level, isAM);
+        float q = SignalQuality.finalQuality(distance * los * weather, tuning);
+        return q > 0.0f && !SignalQuality.isSquelched(q);
+    }
+
     private static void deliverToReceiver(RadioReceiverBlockEntity rx, byte[] data, long sequence,
                                           short hearDistance, boolean stereo) {
         ServerStaticSource source = RadioVoiceService.getSource(rx);
@@ -162,6 +177,10 @@ public final class RadioBroadcast {
         source.sendAudioFrame(data, sequence, hearDistance);
     }
 
+    /**
+     * Full quality sample (used by non-hot paths / tools). Prefer {@link RadioReceiverBlockEntity#acceptsFrom}
+     * on the voice path.
+     */
     public static float qualityToReceiver(
             Level level,
             BlockPos sourcePos,
@@ -175,6 +194,9 @@ public final class RadioBroadcast {
             return 0.0f;
         }
         if (rx.isAM() != isAM) {
+            return 0.0f;
+        }
+        if (sourcePos.distSqr(rx.getBlockPos()) >= (double) rangeBlocks * (double) rangeBlocks) {
             return 0.0f;
         }
         RadioBand band = RadioBand.fromAm(isAM);
@@ -191,107 +213,5 @@ public final class RadioBroadcast {
         float weather = RadioPropagation.weatherFactor(level, isAM);
         float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, rx.getBlockPos());
         return SignalQuality.finalQuality(distance * los * weather * rxAntenna, tuning);
-    }
-
-    private static boolean isDominantForReceiver(
-            Level level,
-            BlockPos sourcePos,
-            float frequency,
-            boolean isAM,
-            int channelKey,
-            int rangeBlocks,
-            RadioReceiverBlockEntity rx,
-            float candidate
-    ) {
-        float best = candidate;
-        // Compare against other active transmitters
-        for (RadioTransmitterBlockEntity other : RadioManager.transmitters()) {
-            if (!other.isActive() || other.getLevel() != level) {
-                continue;
-            }
-            float q = rx.rawQualityFrom(other);
-            if (q > best) {
-                return false;
-            }
-        }
-        // Compare against other virtual sources is approximated by TX list + relays out
-        for (RadioRelayBlockEntity other : RadioManager.relays()) {
-            if (!other.isActive() || other.getLevel() != level) {
-                continue;
-            }
-            if (other.getBlockPos().equals(sourcePos)) {
-                continue;
-            }
-            float q = qualityToReceiver(level, other.getBlockPos(), other.getOutFrequency(),
-                    other.isOutAM(), other.getOutChannelKey(), other.getOutRange(), rx);
-            if (q > best + 0.001f) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static float qualityToRelayIn(
-            Level level,
-            BlockPos sourcePos,
-            float frequency,
-            boolean isAM,
-            int channelKey,
-            int rangeBlocks,
-            RadioRelayBlockEntity relay
-    ) {
-        RadioBand band = RadioBand.fromAm(isAM);
-        float tuning = SignalQuality.tuningFactor(frequency, relay.getInFrequency(), band);
-        if (tuning <= 0.0f) {
-            return 0.0f;
-        }
-        double dist = Math.sqrt(sourcePos.distSqr(relay.getBlockPos()));
-        float distance = SignalQuality.distanceFactor(dist, rangeBlocks, band);
-        if (distance <= 0.0f) {
-            return 0.0f;
-        }
-        float los = RadioPropagation.lineOfSightFactor(level, sourcePos, relay.getBlockPos(), isAM);
-        float weather = RadioPropagation.weatherFactor(level, isAM);
-        return SignalQuality.finalQuality(distance * los * weather, tuning);
-    }
-
-    private static boolean isDominantForRelay(
-            Level level,
-            BlockPos sourcePos,
-            float frequency,
-            boolean isAM,
-            int channelKey,
-            int rangeBlocks,
-            RadioRelayBlockEntity relay,
-            float candidate
-    ) {
-        float best = candidate;
-        for (RadioTransmitterBlockEntity other : RadioManager.transmitters()) {
-            if (!other.isActive() || other.getLevel() != level) {
-                continue;
-            }
-            if (!ChannelKeys.matches(other.getChannelKey(), relay.getInChannelKey())) {
-                continue;
-            }
-            float q = qualityToRelayIn(level, other.getBlockPos(), other.getFrequency(),
-                    other.isAM(), other.getChannelKey(), other.getRange(), relay);
-            if (q > best + 0.001f) {
-                return false;
-            }
-        }
-        for (RadioRelayBlockEntity other : RadioManager.relays()) {
-            if (!other.isActive() || other.getLevel() != level || other.getBlockPos().equals(sourcePos)) {
-                continue;
-            }
-            if (!ChannelKeys.matches(other.getOutChannelKey(), relay.getInChannelKey())) {
-                continue;
-            }
-            float q = qualityToRelayIn(level, other.getBlockPos(), other.getOutFrequency(),
-                    other.isOutAM(), other.getOutChannelKey(), other.getOutRange(), relay);
-            if (q > best + 0.001f) {
-                return false;
-            }
-        }
-        return true;
     }
 }
