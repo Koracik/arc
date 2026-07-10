@@ -53,13 +53,17 @@ public final class RealRadioServerAddon implements AddonInitializer {
 
     private ServerSourceLine radioLine;
 
+    private final DiscsRadioBridge discsBridge = new DiscsRadioBridge();
+
     @Override
     public void onAddonInitialize() {
         radioLine = createRadioLine();
 
         RadioVoiceService.bind(voiceServer, radioLine, this);
         voiceServer.getEventBus().register(this, this);
-        RealRadio.LOGGER.info("Plasmo Voice radio_line registered");
+        // Soft-compat: relay pv-addon-discs jukebox/horn audio through radio TX
+        voiceServer.getEventBus().register(this, discsBridge);
+        RealRadio.LOGGER.info("Plasmo Voice radio_line registered (discs bridge enabled)");
     }
 
     private ServerSourceLine createRadioLine() {
@@ -97,6 +101,7 @@ public final class RealRadioServerAddon implements AddonInitializer {
 
     @Override
     public void onAddonShutdown() {
+        // Unregisters all listeners bound with owner = this (voice + discs bridge)
         voiceServer.getEventBus().unregister(this);
         RadioVoiceService.unbind();
         if (radioLine != null) {
@@ -165,6 +170,13 @@ public final class RealRadioServerAddon implements AddonInitializer {
             }
             if (source == null) {
                 continue;
+            }
+
+            // Player voice is mono Opus; restore mono when speaking so discs stereo
+            // state does not stick after music stops.
+            try {
+                source.setStereo(false);
+            } catch (Throwable ignored) {
             }
 
             // Voice loudness is applied on the client via quality sync + AlSource gain.

@@ -13,6 +13,7 @@ Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo 
 - **Presets M1–M3** (left-click load, right-click save)
 - **Spectrum peaks** on the receiver dial for nearby stations
 - **Vintage GUI**: wooden chrome, LCD, ±, S-meter, mic meter, ON AIR
+- **pv-addon-discs** — music from a jukebox (or goat horn) inside the TX capture radius is relayed over radio
 - Full plan: [`ROADMAP.md`](ROADMAP.md) · config: `config/real_radio-common.toml`
   - **Realism mode:** `[gameplay] realismMode = true` (or `false` for assist UI)
   - Example: [`config-example.toml`](config-example.toml)
@@ -25,6 +26,7 @@ Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo 
 | NeoForge | 21.1.x |
 | Java | 21 |
 | Plasmo Voice | 2.1.0+ (NeoForge) |
+| pv-addon-discs (optional) | 0.1.0+ NeoForge — jukebox music over radio |
 
 ## Build
 
@@ -51,6 +53,7 @@ Install **Plasmo Voice** for NeoForge into the run mods folder (or as a runtime 
 2. Right-click to open the radio GUI.
 3. Enable power, pick AM or FM, tune frequency (and volume on the receiver).
 4. Speak near a powered transmitter; receivers on the same band/frequency play the voice with static based on signal quality.
+5. With **pv-addon-discs** installed: put a custom disc in a jukebox within **4 blocks** of a powered transmitter — receivers tuned to that station play the track.
 
 ## Packages
 
@@ -59,7 +62,7 @@ com.realradio
 ├── common.block / blockentity / menu / registry / util
 ├── client.gui / sound
 ├── network
-└── integration.plasmovoice
+└── integration.plasmovoice   # voice + optional discs bridge
 ```
 
 ## Notes
@@ -68,3 +71,4 @@ com.realradio
 - Server Plasmo addon id: `real_radio` (source line: `radio_line`).
 - Voice loudness is scaled on the **client** via Plasmo Voice `AlSource` (server API has no `setVolume` on static sources).
 - Place a looping OGG at `assets/real_radio/sounds/radio_static.ogg` if you want custom noise (a generated placeholder is included).
+- **Discs bridge** listens to Plasmo `ServerSourceAudioPacketEvent` on the `discs` source line (no hard dependency).

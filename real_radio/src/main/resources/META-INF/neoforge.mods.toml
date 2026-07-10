@@ -32,3 +32,11 @@ AM/FM tuning, range falloff, and static noise simulation.
     versionRange="[2.1.0,)"
     ordering="AFTER"
     side="BOTH"
+
+# Optional: custom disc music from jukeboxes is relayed through radio transmitters
+[[dependencies.${mod_id}]]
+    modId="pv_addon_discs_neoforge"
+    type="optional"
+    versionRange="[0.1.0,)"
+    ordering="NONE"
+    side="SERVER"
