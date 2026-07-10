@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " I ",
+    "IRI",
+    " R "
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "real_radio:radio_receiver" }
+  },
+  "result": {
+    "id": "real_radio:handheld_radio",
+    "count": 1
+  }
+}

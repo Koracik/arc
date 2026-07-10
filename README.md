@@ -2,7 +2,9 @@
 
 Репозиторий Minecraft-мода **Real Radio** для NeoForge 1.21.1.
 
-Мод добавляет реалистичную радиосвязь: передатчик и приёмник с AM/FM, дальностью, помехами и интеграцией с **Plasmo Voice 2.x**.
+Мод добавляет реалистичную радиосвязь: передатчик, приёмник, ретранслятор и рацию с AM/FM, дальностью, помехами и интеграцией с **Plasmo Voice 2.x**.
+
+**Версия: 1.2.0**
 
 ---
 
@@ -14,14 +16,19 @@
 
 - **Radio Transmitter** — ловит голос игроков в радиусе 4 блоков и вещает на частоте
 - **Radio Receiver** — 3D-источник Plasmo Voice на позиции блока
+- **Radio Relay** — ретранслятор с лимитом hop
+- **Handheld Radio** — портативная рация (PTT)
+- **Channel key** — закрытый канал (0 = открытый)
+- **Запись эфира** — REC → radio tape
+- **Карта покрытия** — creative/debug overlay
 - **AM / FM**
   - FM: 87.5–108.0 MHz, шаг 0.1, дальность ≈ base…base×1.5 (авто, ниже частота — дальше)
   - AM: 530–1600 kHz, шаг 10, дальность ≈ base×2…base×3 (авто), линейный спад
 - Дальность **не выбирается игроком** — зависит от частоты; базовое значение в конфиге
-- Конфиг: `config/real_radio-common.toml` (дальность, night, LOS, погода, AGC, squelch)
+- Конфиг: `config/real_radio-common.toml` (дальность, night, LOS, погода, AGC, squelch, features)
 - План / roadmap: [`real_radio/ROADMAP.md`](real_radio/ROADMAP.md)
 - Реализм: LOS (FM), высота антенны, дождь/гроза, помехи, FM capture, AGC, пресеты
-- GUI: дерево, LCD, спектр-пики, M1–M3, S-метр, mic, ON AIR
+- GUI: дерево, LCD, спектр-пики, M1–M3, S-метр, mic, ON AIR, KEY
 - Блоки **без** FE/RF — работают автономно
 
 ### Требования
@@ -40,7 +47,7 @@ cd real_radio
 ./gradlew build
 ```
 
-Готовый jar: `real_radio/build/libs/real_radio-1.0.0.jar`
+Готовый jar: `real_radio/build/libs/real_radio-1.2.0.jar`
 
 ### Установка
 
@@ -53,21 +60,23 @@ cd real_radio
 ```mcfunction
 /give @s real_radio:radio_transmitter
 /give @s real_radio:radio_receiver
+/give @s real_radio:radio_relay
+/give @s real_radio:handheld_radio
 ```
 
 Или скрафти (note block + redstone + iron; для приёмника ещё copper).
 
 1. ПКМ по блоку — открыть GUI  
-2. Включить питание, выбрать AM/FM, настроить частоту  
+2. Включить питание, выбрать AM/FM, настроить частоту и ключ  
 3. Говори рядом с включённым передатчиком  
-4. Приёмник на той же волне воспроизводит голос + шипение  
+4. Приёмник на той же волне/ключе воспроизводит голос + шипение  
 
 ### Структура пакетов
 
 ```
 com.realradio
-├── common.block / blockentity / menu / registry / util
-├── client.gui / sound
+├── common.block / blockentity / menu / registry / util / item
+├── client.gui / sound / coverage
 ├── network
 └── integration.plasmovoice
 ```

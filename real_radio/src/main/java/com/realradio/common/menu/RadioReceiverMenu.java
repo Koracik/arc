@@ -21,7 +21,7 @@ public class RadioReceiverMenu extends AbstractContainerMenu {
 
     public static RadioReceiverMenu fromNetwork(int containerId, Inventory inventory, FriendlyByteBuf buf) {
         BlockPos pos = buf.readBlockPos();
-        return new RadioReceiverMenu(containerId, inventory, pos, new SimpleContainerData(5),
+        return new RadioReceiverMenu(containerId, inventory, pos, new SimpleContainerData(6),
                 ContainerLevelAccess.create(inventory.player.level(), pos));
     }
 
@@ -44,6 +44,7 @@ public class RadioReceiverMenu extends AbstractContainerMenu {
             data.set(2, Float.floatToIntBits(be.getVolume()));
             data.set(3, be.isActive() ? 1 : 0);
             data.set(4, Float.floatToIntBits(be.getSignalQuality()));
+            data.set(5, be.getChannelKey());
         }
     }
 
@@ -69,6 +70,10 @@ public class RadioReceiverMenu extends AbstractContainerMenu {
 
     public float getSignalQuality() {
         return Float.intBitsToFloat(data.get(4));
+    }
+
+    public int getChannelKey() {
+        return data.get(5);
     }
 
     public RadioBand getBand() {

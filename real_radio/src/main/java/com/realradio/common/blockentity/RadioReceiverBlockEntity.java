@@ -2,6 +2,7 @@ package com.realradio.common.blockentity;
 
 import com.realradio.common.menu.RadioReceiverMenu;
 import com.realradio.common.registry.ModBlockEntities;
+import com.realradio.common.util.ChannelKeys;
 import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.common.util.RadioPropagation;
@@ -42,7 +43,8 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
     private static final int DATA_VOLUME_BITS = 2;
     private static final int DATA_ACTIVE = 3;
     private static final int DATA_QUALITY_BITS = 4;
-    private static final int DATA_COUNT = 5;
+    private static final int DATA_CHANNEL_KEY = 5;
+    private static final int DATA_COUNT = 6;
 
     public static final double LISTENER_SYNC_RADIUS = 32.0;
 
@@ -51,6 +53,8 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
     private float volume = 0.8f;
     private boolean active;
     private float signalQuality;
+    private int channelKey = ChannelKeys.OPEN;
+    private boolean recording;
     private final ChannelPresets presets = new ChannelPresets();
     private int spectrumTickCounter;
 
@@ -63,6 +67,7 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
                 case DATA_VOLUME_BITS -> Float.floatToIntBits(volume);
                 case DATA_ACTIVE -> active ? 1 : 0;
                 case DATA_QUALITY_BITS -> Float.floatToIntBits(signalQuality);
+                case DATA_CHANNEL_KEY -> channelKey;
                 default -> 0;
             };
         }
@@ -75,6 +80,7 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
                 case DATA_VOLUME_BITS -> volume = Float.intBitsToFloat(value);
                 case DATA_ACTIVE -> active = value != 0;
                 case DATA_QUALITY_BITS -> signalQuality = Float.intBitsToFloat(value);
+                case DATA_CHANNEL_KEY -> channelKey = ChannelKeys.clamp(value);
                 default -> {
                 }
             }
@@ -128,6 +134,9 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
 
     public void onRemoved() {
         if (level != null && !level.isClientSide) {
+            if (recording) {
+                com.realradio.common.util.AirRecording.finish(this);
+            }
             RadioManager.unregisterReceiver(this);
             RadioVoiceService.removeSource(this);
         }
@@ -162,11 +171,41 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
                 qualities.add(q);
             }
         }
+        for (RadioRelayBlockEntity relay : RadioManager.relays()) {
+            float q = rawQualityFromRelay(relay, band, self);
+            if (q > 0.0f) {
+                qualities.add(q);
+            }
+        }
         return qualities;
+    }
+
+    private float rawQualityFromRelay(RadioRelayBlockEntity relay, RadioBand band, BlockPos self) {
+        if (!relay.isActive() || relay.getLevel() != level || relay.isOutAM() != isAM) {
+            return 0.0f;
+        }
+        if (!ChannelKeys.matches(relay.getOutChannelKey(), channelKey)) {
+            return 0.0f;
+        }
+        float tuning = SignalQuality.tuningFactor(relay.getOutFrequency(), frequency, band);
+        if (tuning <= 0.0f) {
+            return 0.0f;
+        }
+        double dist = Math.sqrt(relay.getBlockPos().distSqr(self));
+        float distance = SignalQuality.distanceFactor(dist, relay.getOutRange(), band);
+        if (distance <= 0.0f) {
+            return 0.0f;
+        }
+        float los = RadioPropagation.lineOfSightFactor(level, relay.getBlockPos(), self, isAM);
+        float weather = RadioPropagation.weatherFactor(level, isAM);
+        return SignalQuality.finalQuality(distance * los * weather, tuning);
     }
 
     private float rawQualityFrom(RadioTransmitterBlockEntity tx, RadioBand band, BlockPos self) {
         if (!tx.isActive() || tx.getLevel() != level || tx.isAM() != isAM) {
+            return 0.0f;
+        }
+        if (!ChannelKeys.matches(tx.getChannelKey(), channelKey)) {
             return 0.0f;
         }
         float tuning = SignalQuality.tuningFactor(tx.getFrequency(), frequency, band);
@@ -265,6 +304,9 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
             if (!tx.isActive() || tx.getLevel() != level || tx.isAM() != isAM) {
                 continue;
             }
+            if (!ChannelKeys.matches(tx.getChannelKey(), channelKey)) {
+                continue;
+            }
             // Perfect tuning hypothetical for spectrum peak height
             float perfectTuning = 1.0f;
             double dist = Math.sqrt(tx.getBlockPos().distSqr(self));
@@ -357,13 +399,39 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         return dataAccess;
     }
 
-    public void applySettings(float frequency, boolean isAM, float volume, boolean active) {
+    public int getChannelKey() {
+        return channelKey;
+    }
+
+    public void setChannelKey(int channelKey) {
+        this.channelKey = ChannelKeys.clamp(channelKey);
+        setChangedAndSync();
+    }
+
+    public boolean isRecording() {
+        return recording;
+    }
+
+    public void setRecording(boolean recording) {
+        this.recording = recording && active;
+        setChangedAndSync();
+    }
+
+    public void applySettings(float frequency, boolean isAM, float volume, boolean active, int channelKey) {
         this.isAM = isAM;
         this.frequency = getBand().snap(frequency);
         this.volume = Math.max(0.0f, Math.min(1.0f, volume));
         this.active = active;
+        this.channelKey = ChannelKeys.clamp(channelKey);
+        if (!active) {
+            this.recording = false;
+        }
         ensureVoiceSource();
         setChangedAndSync();
+    }
+
+    public void applySettings(float frequency, boolean isAM, float volume, boolean active) {
+        applySettings(frequency, isAM, volume, active, this.channelKey);
     }
 
     private void setChangedAndSync() {
@@ -381,6 +449,7 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         tag.putBoolean("isAM", isAM);
         tag.putFloat("volume", volume);
         tag.putBoolean("active", active);
+        tag.putInt("channelKey", channelKey);
         presets.saveToNbt(tag);
     }
 
@@ -392,6 +461,7 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         volume = tag.contains("volume") ? tag.getFloat("volume") : 0.8f;
         volume = Math.max(0.0f, Math.min(1.0f, volume));
         active = tag.getBoolean("active");
+        channelKey = ChannelKeys.clamp(tag.contains("channelKey") ? tag.getInt("channelKey") : ChannelKeys.OPEN);
         presets.loadFromNbt(tag);
     }
 

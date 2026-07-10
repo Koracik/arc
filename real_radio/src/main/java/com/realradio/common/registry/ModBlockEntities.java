@@ -2,6 +2,7 @@ package com.realradio.common.registry;
 
 import com.realradio.RealRadio;
 import com.realradio.common.blockentity.RadioReceiverBlockEntity;
+import com.realradio.common.blockentity.RadioRelayBlockEntity;
 import com.realradio.common.blockentity.RadioTransmitterBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -20,6 +21,11 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioReceiverBlockEntity>> RADIO_RECEIVER =
             REGISTER.register("radio_receiver", () ->
                     BlockEntityType.Builder.of(RadioReceiverBlockEntity::new, ModBlocks.RADIO_RECEIVER.get())
+                            .build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RadioRelayBlockEntity>> RADIO_RELAY =
+            REGISTER.register("radio_relay", () ->
+                    BlockEntityType.Builder.of(RadioRelayBlockEntity::new, ModBlocks.RADIO_RELAY.get())
                             .build(null));
 
     private ModBlockEntities() {

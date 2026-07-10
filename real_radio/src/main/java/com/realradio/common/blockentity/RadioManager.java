@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class RadioManager {
     private static final Map<DimPos, RadioTransmitterBlockEntity> TRANSMITTERS = new ConcurrentHashMap<>();
     private static final Map<DimPos, RadioReceiverBlockEntity> RECEIVERS = new ConcurrentHashMap<>();
+    private static final Map<DimPos, RadioRelayBlockEntity> RELAYS = new ConcurrentHashMap<>();
 
     private RadioManager() {
     }
@@ -47,12 +48,30 @@ public final class RadioManager {
         RECEIVERS.remove(DimPos.of(be.getLevel(), be.getBlockPos()), be);
     }
 
+    public static void registerRelay(RadioRelayBlockEntity be) {
+        if (be.getLevel() == null) {
+            return;
+        }
+        RELAYS.put(DimPos.of(be.getLevel(), be.getBlockPos()), be);
+    }
+
+    public static void unregisterRelay(RadioRelayBlockEntity be) {
+        if (be.getLevel() == null) {
+            return;
+        }
+        RELAYS.remove(DimPos.of(be.getLevel(), be.getBlockPos()), be);
+    }
+
     public static Collection<RadioTransmitterBlockEntity> transmitters() {
         return Collections.unmodifiableCollection(TRANSMITTERS.values());
     }
 
     public static Collection<RadioReceiverBlockEntity> receivers() {
         return Collections.unmodifiableCollection(RECEIVERS.values());
+    }
+
+    public static Collection<RadioRelayBlockEntity> relays() {
+        return Collections.unmodifiableCollection(RELAYS.values());
     }
 
     public record DimPos(ResourceKey<Level> dimension, BlockPos pos) {

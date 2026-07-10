@@ -2,13 +2,20 @@
 
 Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo Voice 2.x**.
 
+**Version: 1.2.0**
+
 ## Features
 
 - **Radio Transmitter** — captures nearby player voice (4-block radius) and broadcasts on AM/FM
 - **Radio Receiver** — plays received voice as a 3D Plasmo Voice static source
+- **Radio Relay** — retransmits on another frequency/band/key (hop-limited)
+- **Handheld Radio** — portable RX/TX with PTT hotkey (`V` by default)
+- **Channel key** — closed channel (matching key required; `0` = open)
+- **Air recording** — REC on receiver drops a **Radio Tape**; use tape to rebroadcast
+- **Coverage map** — creative/debug overlay (`H` or Coverage Mapper item)
 - **AM / FM** with frequency-based range (not player power slider)
   - Config `baseRangeBlocks` (default **2500**), night AM boost, antenna height
-- **Propagation**: FM line-of-sight / terrain, rain & thunder attenuation
+- **Propagation**: FM line-of-sight / terrain (cached), rain & thunder attenuation
 - **Tuning / interference / FM capture**, squelch, soft AGC
 - **Presets M1–M3** (left-click load, right-click save)
 - **Spectrum peaks** on the receiver dial for nearby stations
@@ -34,7 +41,7 @@ Realistic radio system for **Minecraft 1.21.1 / NeoForge 21.1.x** with **Plasmo 
 ./gradlew build
 ```
 
-Output: `build/libs/real_radio-1.0.0.jar`
+Output: `build/libs/real_radio-1.2.0.jar`
 
 ## Run (dev)
 
@@ -47,20 +54,27 @@ Install **Plasmo Voice** for NeoForge into the run mods folder (or as a runtime 
 
 ## In-game
 
-1. Craft or give blocks:
+1. Craft or give blocks/items:
    - `/give @s real_radio:radio_transmitter`
    - `/give @s real_radio:radio_receiver`
+   - `/give @s real_radio:radio_relay`
+   - `/give @s real_radio:handheld_radio`
+   - `/give @s real_radio:radio_tape`
+   - `/give @s real_radio:coverage_mapper` (creative/debug)
 2. Right-click to open the radio GUI.
 3. Enable power, pick AM or FM, tune frequency (and volume on the receiver).
-4. Speak near a powered transmitter; receivers on the same band/frequency play the voice with static based on signal quality.
-5. With **pv-addon-discs** installed: put a custom disc in a jukebox within **4 blocks** of a powered transmitter — receivers tuned to that station play the track.
+4. Optional **Key** (0–9999): matching key on TX and RX for a closed channel.
+5. Speak near a powered transmitter; receivers on the same band/frequency/key play the voice with static based on signal quality.
+6. **REC** on the receiver captures air to a tape item; use the tape to play back.
+7. Handheld: power on, tune, hold **PTT** (`V`) to transmit; receive when powered.
+8. Coverage overlay: key **H** or use Coverage Mapper (disabled in realism for survival).
 
 ## Packages
 
 ```
 com.realradio
-├── common.block / blockentity / menu / registry / util
-├── client.gui / sound
+├── common.block / blockentity / menu / registry / util / item
+├── client.gui / sound / coverage
 ├── network
 └── integration.plasmovoice   # voice + optional discs bridge
 ```

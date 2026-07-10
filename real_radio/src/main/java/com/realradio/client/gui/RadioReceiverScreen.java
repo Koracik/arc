@@ -2,12 +2,14 @@ package com.realradio.client.gui;
 
 import com.realradio.client.sound.StationSpectrumCache;
 import com.realradio.common.menu.RadioReceiverMenu;
+import com.realradio.common.util.ChannelKeys;
 import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.common.util.SignalQuality;
 import com.realradio.config.RealRadioConfig;
 import com.realradio.network.NearbyStationsPayload;
 import com.realradio.network.RadioPresetPayload;
+import com.realradio.network.ReceiverRecordPayload;
 import com.realradio.network.UpdateReceiverPayload;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -29,6 +31,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
     private boolean isAM;
     private float volume;
     private boolean active;
+    private int channelKey;
 
     private RadioWidgets.RadioSlider frequencySlider;
     private RadioWidgets.RadioSlider volumeSlider;
@@ -36,6 +39,10 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
     private Button powerButton;
     private Button freqMinus;
     private Button freqPlus;
+    private Button keyMinus;
+    private Button keyPlus;
+    private Button recButton;
+    private boolean recording;
     private final Button[] presetButtons = new Button[ChannelPresets.COUNT];
 
     public RadioReceiverScreen(RadioReceiverMenu menu, Inventory inventory, Component title) {
@@ -45,6 +52,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         this.isAM = menu.isAM();
         this.volume = menu.getVolume();
         this.active = menu.isActive();
+        this.channelKey = menu.getChannelKey();
     }
 
     @Override
@@ -82,8 +90,13 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         );
         addRenderableWidget(volumeSlider);
 
+        keyMinus = RadioWidgets.stepButton(x + 16, y + 132, 16, "−", () -> stepKey(-1));
+        keyPlus = RadioWidgets.stepButton(x + 16 + contentW - 16, y + 132, 16, "+", () -> stepKey(1));
+        addRenderableWidget(keyMinus);
+        addRenderableWidget(keyPlus);
+
         // Presets M1–M3 (left-click load, right-click save)
-        int presetY = y + 140;
+        int presetY = y + 152;
         int pw = (contentW - 8) / 3;
         for (int i = 0; i < ChannelPresets.COUNT; i++) {
             final int slot = i;
@@ -95,7 +108,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
                         // optimistic local apply after short delay is hard; pull from next container sync
                         playClick();
                     }
-            ).bounds(x + 16 + i * (pw + 4), presetY, pw, 18).build();
+            ).bounds(x + 16 + i * (pw + 4), presetY, pw, 16).build();
             presetButtons[i].setTooltip(Tooltip.create(Component.translatable("gui.real_radio.preset_hint")));
             addRenderableWidget(presetButtons[i]);
         }
@@ -108,7 +121,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
             b.setMessage(amFmLabel());
             playClick();
             sendUpdate();
-        }).bounds(x + 16, y + 164, btnW, 20).build();
+        }).bounds(x + 16, y + 172, btnW, 18).build();
         addRenderableWidget(amFmButton);
 
         powerButton = Button.builder(powerLabel(), b -> {
@@ -116,8 +129,26 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
             b.setMessage(powerLabel());
             playClick();
             sendUpdate();
-        }).bounds(x + 16 + btnW + 8, y + 164, btnW, 20).build();
+        }).bounds(x + 16 + btnW + 8, y + 172, btnW, 18).build();
         addRenderableWidget(powerButton);
+
+        recButton = Button.builder(recLabel(), b -> {
+            recording = !recording;
+            b.setMessage(recLabel());
+            playClick();
+            PacketDistributor.sendToServer(new ReceiverRecordPayload(blockPos, recording));
+        }).bounds(x + 16, y + 192, 48, 14).build();
+        addRenderableWidget(recButton);
+    }
+
+    private Component recLabel() {
+        return Component.translatable(recording ? "gui.real_radio.record_on" : "gui.real_radio.record");
+    }
+
+    private void stepKey(int dir) {
+        channelKey = ChannelKeys.clamp(channelKey + dir);
+        playClick();
+        sendUpdate();
     }
 
     @Override
@@ -225,7 +256,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
     }
 
     private void sendUpdate() {
-        PacketDistributor.sendToServer(new UpdateReceiverPayload(blockPos, frequency, isAM, volume, active));
+        PacketDistributor.sendToServer(new UpdateReceiverPayload(blockPos, frequency, isAM, volume, active, channelKey));
     }
 
     @Override
@@ -251,6 +282,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         }
         volume = menu.getVolume();
         active = menu.isActive();
+        channelKey = menu.getChannelKey();
         if (powerButton != null) {
             powerButton.setMessage(powerLabel());
         }
@@ -265,6 +297,9 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         String side = isAM ? "AM" : "FM";
         RadioWidgets.drawLcd(graphics, font, leftPos + 16, topPos + 30, imageWidth - 32, 28, main, side, active);
 
+        String keyLabel = Component.translatable("gui.real_radio.channel_key", ChannelKeys.format(channelKey)).getString();
+        graphics.drawString(font, keyLabel, leftPos + 36, topPos + 136, RadioWidgets.COL_AMBER_LIT, false);
+
         boolean realism = RealRadioConfig.realismMode();
         if (!realism) {
             float quality = active ? menu.getSignalQuality() : 0.0f;
@@ -272,8 +307,8 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
             String pct = Math.round(quality * 100) + "%";
             graphics.drawString(font,
                     Component.translatable("gui.real_radio.s_meter").getString(),
-                    leftPos + 16, topPos + 190, RadioWidgets.COL_AMBER_DIM, false);
-            RadioWidgets.drawSMeter(graphics, font, leftPos + 16, topPos + 200, 110, quality, word, pct);
+                    leftPos + 16, topPos + 194, RadioWidgets.COL_AMBER_DIM, false);
+            RadioWidgets.drawSMeter(graphics, font, leftPos + 16, topPos + 204, 110, quality, word, pct);
 
             graphics.drawString(font,
                     Component.translatable("gui.real_radio.spectrum_hint").getString(),
@@ -282,7 +317,7 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
             // Realism: no station assist — only frequency and ear
             graphics.drawString(font,
                     Component.translatable("gui.real_radio.realism_hint").getString(),
-                    leftPos + 16, topPos + 190, RadioWidgets.COL_AMBER_DIM, false);
+                    leftPos + 16, topPos + 194, RadioWidgets.COL_AMBER_DIM, false);
         }
     }
 }

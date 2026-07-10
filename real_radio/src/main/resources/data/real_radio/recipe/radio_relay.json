@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " T ",
+    "RCR",
+    " I "
+  ],
+  "key": {
+    "T": { "item": "real_radio:radio_transmitter" },
+    "R": { "item": "real_radio:radio_receiver" },
+    "C": { "item": "minecraft:comparator" },
+    "I": { "item": "minecraft:iron_ingot" }
+  },
+  "result": {
+    "id": "real_radio:radio_relay",
+    "count": 1
+  }
+}

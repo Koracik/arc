@@ -20,6 +20,10 @@ public final class ModCreativeTabs {
                     .displayItems((params, output) -> {
                         output.accept(ModItems.RADIO_TRANSMITTER.get());
                         output.accept(ModItems.RADIO_RECEIVER.get());
+                        output.accept(ModItems.RADIO_RELAY.get());
+                        output.accept(ModItems.HANDHELD_RADIO.get());
+                        output.accept(ModItems.RADIO_TAPE.get());
+                        output.accept(ModItems.COVERAGE_MAPPER.get());
                     })
                     .build()
     );

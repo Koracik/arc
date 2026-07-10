@@ -1,7 +1,9 @@
 package com.realradio.common.registry;
 
 import com.realradio.RealRadio;
+import com.realradio.common.menu.HandheldRadioMenu;
 import com.realradio.common.menu.RadioReceiverMenu;
+import com.realradio.common.menu.RadioRelayMenu;
 import com.realradio.common.menu.RadioTransmitterMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
@@ -20,6 +22,14 @@ public final class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<RadioReceiverMenu>> RADIO_RECEIVER =
             REGISTER.register("radio_receiver", () ->
                     IMenuTypeExtension.create(RadioReceiverMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<RadioRelayMenu>> RADIO_RELAY =
+            REGISTER.register("radio_relay", () ->
+                    IMenuTypeExtension.create(RadioRelayMenu::fromNetwork));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<HandheldRadioMenu>> HANDHELD_RADIO =
+            REGISTER.register("handheld_radio", () ->
+                    IMenuTypeExtension.create(HandheldRadioMenu::fromNetwork));
 
     private ModMenus() {
     }

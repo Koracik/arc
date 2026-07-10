@@ -2,6 +2,7 @@ package com.realradio.common.registry;
 
 import com.realradio.RealRadio;
 import com.realradio.common.block.RadioReceiverBlock;
+import com.realradio.common.block.RadioRelayBlock;
 import com.realradio.common.block.RadioTransmitterBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
@@ -21,6 +22,11 @@ public final class ModBlocks {
     public static final DeferredBlock<RadioReceiverBlock> RADIO_RECEIVER = REGISTER.register(
             "radio_receiver",
             () -> new RadioReceiverBlock(baseProps(MapColor.WOOD))
+    );
+
+    public static final DeferredBlock<RadioRelayBlock> RADIO_RELAY = REGISTER.register(
+            "radio_relay",
+            () -> new RadioRelayBlock(baseProps(MapColor.COLOR_ORANGE))
     );
 
     private static BlockBehaviour.Properties baseProps(MapColor color) {

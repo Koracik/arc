@@ -2,10 +2,9 @@ package com.realradio.integration.plasmovoice;
 
 import com.realradio.RealRadio;
 import com.realradio.common.blockentity.RadioManager;
-import com.realradio.common.blockentity.RadioReceiverBlockEntity;
 import com.realradio.common.blockentity.RadioTransmitterBlockEntity;
-import com.realradio.common.util.RadioBand;
-import com.realradio.common.util.SignalQuality;
+import com.realradio.common.util.HandheldRadioService;
+import com.realradio.common.util.RadioBroadcast;
 import su.plo.voice.api.addon.AddonInitializer;
 import su.plo.voice.api.addon.AddonLoaderScope;
 import su.plo.voice.api.addon.InjectPlasmoVoice;
@@ -14,7 +13,6 @@ import su.plo.voice.api.event.EventSubscribe;
 import su.plo.voice.api.server.PlasmoVoiceServer;
 import su.plo.voice.api.server.audio.line.BaseServerSourceLine;
 import su.plo.voice.api.server.audio.line.ServerSourceLine;
-import su.plo.voice.api.server.audio.source.ServerStaticSource;
 import su.plo.voice.api.server.event.audio.source.PlayerSpeakEndEvent;
 import su.plo.voice.api.server.event.audio.source.PlayerSpeakEvent;
 import su.plo.voice.api.server.player.VoicePlayer;
@@ -34,7 +32,7 @@ import java.io.InputStream;
         id = "real_radio",
         name = "Real Radio",
         scope = AddonLoaderScope.SERVER,
-        version = "1.0.0",
+        version = "1.2.0",
         authors = {"Real Radio"}
 )
 public final class RealRadioServerAddon implements AddonInitializer {
@@ -130,6 +128,11 @@ public final class RealRadioServerAddon implements AddonInitializer {
         long sequence = packet.getSequenceNumber();
         short distance = (short) 16; // hear radius around each receiver static source
 
+        // Handheld PTT takes priority when active
+        if (HandheldRadioService.tryTransmitFromPlayer(player, data, sequence)) {
+            return;
+        }
+
         for (RadioTransmitterBlockEntity tx : RadioManager.transmitters()) {
             if (!tx.isActive() || tx.getLevel() != player.level()) {
                 continue;
@@ -139,49 +142,13 @@ public final class RealRadioServerAddon implements AddonInitializer {
             }
 
             tx.markSpeaking();
-            relayFromTransmitter(tx, data, sequence, distance);
+            RadioBroadcast.fromTransmitter(tx, data, sequence, distance, false);
         }
     }
 
     @EventSubscribe
     public void onPlayerSpeakEnd(PlayerSpeakEndEvent event) {
         // Static sources auto-end when frames stop; nothing mandatory here.
-    }
-
-    private void relayFromTransmitter(RadioTransmitterBlockEntity tx, byte[] data, long sequence, short distance) {
-        for (RadioReceiverBlockEntity rx : RadioManager.receivers()) {
-            if (!rx.isActive() || rx.getLevel() != tx.getLevel() || rx.isAM() != tx.isAM()) {
-                continue;
-            }
-
-            // Only the dominant station is relayed (FM capture / avoid AM garble).
-            // Combined quality (interference) is applied client-side via voice gain.
-            if (!rx.isDominantTransmitter(tx)) {
-                continue;
-            }
-            float quality = rx.rawQualityFrom(tx);
-            if (quality <= 0.0f || SignalQuality.isSquelched(rx.getSignalQuality())) {
-                continue;
-            }
-
-            ServerStaticSource source = RadioVoiceService.getSource(rx);
-            if (source == null) {
-                source = RadioVoiceService.createSource(rx);
-            }
-            if (source == null) {
-                continue;
-            }
-
-            // Player voice is mono Opus; restore mono when speaking so discs stereo
-            // state does not stick after music stops.
-            try {
-                source.setStereo(false);
-            } catch (Throwable ignored) {
-            }
-
-            // Voice loudness is applied on the client via quality sync + AlSource gain.
-            source.sendAudioFrame(data, sequence, distance);
-        }
     }
 
     public PlasmoVoiceServer getVoiceServer() {

@@ -31,7 +31,7 @@
 
 ---
 
-## Текущая итерация (v1.1 realism pack)
+## Сделано (v1.1 realism pack)
 
 | # | Фича | Статус |
 |---|------|--------|
@@ -46,12 +46,28 @@
 | 9 | **Always-on quiet hiss** while RX powered (squelch only mutes voice) | done |
 | 10 | **`realismMode`** — hide spectrum / S-meter / signal % (find by ear) | done |
 
+---
+
+## Сделано (v1.2)
+
+| # | Фича | Статус |
+|---|------|--------|
+| 1 | **LOS cache** — grid quantize, TTL/size config, half-evict | done |
+| 2 | **Texture atlas** — wooden block/item/GUI art pass | done |
+| 3 | **Coverage map** — creative/debug overlay (key `H` / mapper item) | done |
+| 4 | **Radio relay** — RX→TX bridge with hop limit | done |
+| 5 | **Channel key** — closed channel (0 = open) | done |
+| 6 | ~~FE/RF power~~ | **out of scope** (blocks stay self-powered) |
+| 7 | **Air recording** — REC on RX → `radio_tape` playback | done |
+| 8 | **Handheld radio** — item + PTT hotkey (`V`) | done |
+
 Конфиг (`config/real_radio-common.toml`):
-- `[gameplay]` **`realismMode`** (default true) — вкл/выкл в `config/real_radio-common.toml`
+- `[gameplay]` **`realismMode`**
 - `[range]` `baseRangeBlocks`, `amNightMultiplier`, `antennaHeightBonus`
-- `[audio]` `squelchThreshold` (voice only), `staticVolumeScale` (default 0.05), `enableAgc`, `agcExponent`
-- `[propagation]` `enableLineOfSight`, `losSampleStep`, `losMaxPenalty`, `fmRainFactor`, `fmThunderFactor`
-- Пример файла: [`config-example.toml`](config-example.toml)
+- `[audio]` `squelchThreshold`, `staticVolumeScale`, `enableAgc`, `agcExponent`
+- `[propagation]` `enableLineOfSight`, `losSampleStep`, `losMaxPenalty`, `losCacheGrid`, `losCacheTtlMs`, `losCacheMax`, weather factors
+- `[features]` `requireMatchingKey`, `maxRelayHops`, `enableCoverageOverlay`, `maxRecordingSeconds`, `handheldRangeFactor`
+- Пример: [`config-example.toml`](config-example.toml)
 
 ---
 
@@ -61,26 +77,14 @@
 
 ---
 
-## Ближайшее будущее (v1.2+)
+## Будущее (после v1.2)
 
-1. **Кэширование LOS** на multi-chunk дистанциях (если нагрузка)
-2. **Полноценная texture atlas** деревянного радио (art pass)
-3. **Карта покрытия** (debug / creative overlay)
-4. **Релейные ретрансляторы** (RX→TX bridge)
-5. **Шифрование / «закрытый канал»** (общий ключ на блоках)
-6. **Интеграция с FE/RF** (опциональное питание)
-7. **Запись эфира** (server-side buffer, playback)
-8. **Мобильная рация** (item + hotkey)
-
----
-
-## Дальние идеи / research
-
-- Полный raycast occlusion с учётом материалов (железо сильнее дерева)
-- Ionosphere sim (только AM, фазы луны / погода мира)
-- Multi-language TTS station IDs
-- Compatibility: Simple Voice Chat fallback (без Plasmo)
-- Fabric port
+1. **Интеграция с FE/RF** (опциональное питание) — отложено по запросу; блоки self-powered
+2. Полный raycast occlusion с учётом материалов (железо сильнее дерева)
+3. Ionosphere sim (только AM, фазы луны / погода мира)
+4. Multi-language TTS station IDs
+5. Compatibility: Simple Voice Chat fallback (без Plasmo)
+6. Fabric port
 
 ---
 

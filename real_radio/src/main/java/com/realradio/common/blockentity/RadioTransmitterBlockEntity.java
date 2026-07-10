@@ -2,6 +2,7 @@ package com.realradio.common.blockentity;
 
 import com.realradio.common.menu.RadioTransmitterMenu;
 import com.realradio.common.registry.ModBlockEntities;
+import com.realradio.common.util.ChannelKeys;
 import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.common.util.RadioPropagation;
@@ -38,11 +39,13 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     private static final int DATA_RANGE = 2;
     private static final int DATA_ACTIVE = 3;
     private static final int DATA_SPEAKING = 4;
-    private static final int DATA_COUNT = 5;
+    private static final int DATA_CHANNEL_KEY = 5;
+    private static final int DATA_COUNT = 6;
 
     private float frequency = RadioBand.FM.defaultFrequency();
     private boolean isAM;
     private boolean active;
+    private int channelKey = ChannelKeys.OPEN;
     private long lastSpeakMs;
     private final ChannelPresets presets = new ChannelPresets();
 
@@ -55,6 +58,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
                 case DATA_RANGE -> getRange();
                 case DATA_ACTIVE -> active ? 1 : 0;
                 case DATA_SPEAKING -> isSpeakingNow() ? 1 : 0;
+                case DATA_CHANNEL_KEY -> channelKey;
                 default -> 0;
             };
         }
@@ -69,6 +73,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
                 case DATA_ACTIVE -> active = value != 0;
                 case DATA_SPEAKING -> {
                 }
+                case DATA_CHANNEL_KEY -> channelKey = ChannelKeys.clamp(value);
                 default -> {
                 }
             }
@@ -203,11 +208,27 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         return dataAccess;
     }
 
-    public void applySettings(float frequency, boolean isAM, boolean active) {
+    public int getChannelKey() {
+        return channelKey;
+    }
+
+    public void setChannelKey(int channelKey) {
+        this.channelKey = ChannelKeys.clamp(channelKey);
+        setChangedAndSync();
+    }
+
+    public void applySettings(float frequency, boolean isAM, boolean active, int channelKey) {
         this.isAM = isAM;
         this.frequency = getBand().snap(frequency);
         this.active = active;
+        this.channelKey = ChannelKeys.clamp(channelKey);
         setChangedAndSync();
+    }
+
+    /** @deprecated use {@link #applySettings(float, boolean, boolean, int)} */
+    @Deprecated
+    public void applySettings(float frequency, boolean isAM, boolean active) {
+        applySettings(frequency, isAM, active, this.channelKey);
     }
 
     private void setChangedAndSync() {
@@ -224,6 +245,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         tag.putFloat("frequency", frequency);
         tag.putBoolean("isAM", isAM);
         tag.putBoolean("active", active);
+        tag.putInt("channelKey", channelKey);
         presets.saveToNbt(tag);
     }
 
@@ -233,6 +255,7 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
         isAM = tag.getBoolean("isAM");
         frequency = getBand().snap(tag.contains("frequency") ? tag.getFloat("frequency") : getBand().defaultFrequency());
         active = tag.getBoolean("active");
+        channelKey = ChannelKeys.clamp(tag.contains("channelKey") ? tag.getInt("channelKey") : ChannelKeys.OPEN);
         presets.loadFromNbt(tag);
     }
 

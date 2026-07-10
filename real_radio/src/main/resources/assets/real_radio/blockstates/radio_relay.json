@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "real_radio:block/radio_relay"
+    }
+  }
+}

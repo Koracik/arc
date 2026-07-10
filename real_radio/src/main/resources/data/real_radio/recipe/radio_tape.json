@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PPP",
+    "PRP",
+    "PPP"
+  ],
+  "key": {
+    "P": { "item": "minecraft:paper" },
+    "R": { "item": "minecraft:redstone" }
+  },
+  "result": {
+    "id": "real_radio:radio_tape",
+    "count": 1
+  }
+}

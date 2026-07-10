@@ -24,5 +24,20 @@
 	enableLineOfSight = true
 	losSampleStep = 6
 	losMaxPenalty = 0.85
+	losCacheGrid = 8
+	losCacheTtlMs = 1500
+	losCacheMax = 4096
 	fmRainFactor = 0.85
 	fmThunderFactor = 0.7
+
+[features]
+	# TX/RX channelKey must match (0 = open / unencrypted)
+	requireMatchingKey = true
+	# Max retransmissions per audio frame through relay blocks
+	maxRelayHops = 3
+	# Creative/debug coverage overlay (still off in realism for survival)
+	enableCoverageOverlay = true
+	# Max seconds buffered into a radio tape
+	maxRecordingSeconds = 45
+	# Handheld TX range as fraction of block transmitter range
+	handheldRangeFactor = 0.35

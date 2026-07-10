@@ -4,6 +4,7 @@ import com.realradio.RealRadio;
 import com.realradio.common.blockentity.RadioReceiverBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 import su.plo.slib.api.server.McServerLib;
 import su.plo.slib.api.server.position.ServerPos3d;
@@ -13,6 +14,7 @@ import su.plo.voice.api.server.audio.line.ServerSourceLine;
 import su.plo.voice.api.server.audio.source.ServerStaticSource;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -99,6 +101,34 @@ public final class RadioVoiceService {
             } catch (Throwable t) {
                 RealRadio.LOGGER.warn("Failed to remove Plasmo static source", t);
             }
+        }
+    }
+
+    /**
+     * Static source near a player for handheld RX (position fixed at create; good enough for short range).
+     */
+    public static ServerStaticSource createPlayerSource(ServerPlayer player) {
+        if (!isReady() || player == null) {
+            return null;
+        }
+        ServerLevel serverLevel = player.serverLevel();
+        BlockPos pos = player.blockPosition();
+        try {
+            McServerLib mc = voiceServer.getMinecraftServer();
+            McServerWorld world = mc.getWorld(serverLevel);
+            ServerPos3d sourcePos = new ServerPos3d(
+                    world,
+                    player.getX(),
+                    player.getY() + 1.0,
+                    player.getZ()
+            );
+            ServerStaticSource source = radioLine.createStaticSource(sourcePos, false);
+            source.setIconVisible(false);
+            source.setName("Handheld");
+            return source;
+        } catch (Throwable t) {
+            RealRadio.LOGGER.error("Failed to create handheld Plasmo source for {}", player.getGameProfile().getName(), t);
+            return null;
         }
     }
 }

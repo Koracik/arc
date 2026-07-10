@@ -1,6 +1,7 @@
 package com.realradio.client.gui;
 
 import com.realradio.common.menu.RadioTransmitterMenu;
+import com.realradio.common.util.ChannelKeys;
 import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
 import com.realradio.config.RealRadioConfig;
@@ -22,12 +23,15 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
     private float frequency;
     private boolean isAM;
     private boolean active;
+    private int channelKey;
 
     private RadioWidgets.RadioSlider frequencySlider;
     private Button amFmButton;
     private Button powerButton;
     private Button freqMinus;
     private Button freqPlus;
+    private Button keyMinus;
+    private Button keyPlus;
     private final Button[] presetButtons = new Button[ChannelPresets.COUNT];
 
     public RadioTransmitterScreen(RadioTransmitterMenu menu, Inventory inventory, Component title) {
@@ -36,6 +40,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         this.frequency = menu.getFrequency();
         this.isAM = menu.isAM();
         this.active = menu.isActive();
+        this.channelKey = menu.getChannelKey();
     }
 
     @Override
@@ -57,7 +62,12 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         freqPlus = RadioWidgets.stepButton(sliderX + sliderW + 2, y + 78, 16, "+", () -> stepFrequency(1));
         addRenderableWidget(freqPlus);
 
-        int presetY = y + 140;
+        keyMinus = RadioWidgets.stepButton(x + 16, y + 132, 16, "−", () -> stepKey(-1));
+        keyPlus = RadioWidgets.stepButton(x + 16 + contentW - 16, y + 132, 16, "+", () -> stepKey(1));
+        addRenderableWidget(keyMinus);
+        addRenderableWidget(keyPlus);
+
+        int presetY = y + 152;
         int pw = (contentW - 8) / 3;
         for (int i = 0; i < ChannelPresets.COUNT; i++) {
             final int slot = i;
@@ -67,7 +77,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
                         PacketDistributor.sendToServer(new RadioPresetPayload(blockPos, true, slot, false));
                         playClick();
                     }
-            ).bounds(x + 16 + i * (pw + 4), presetY, pw, 18).build();
+            ).bounds(x + 16 + i * (pw + 4), presetY, pw, 16).build();
             presetButtons[i].setTooltip(Tooltip.create(Component.translatable("gui.real_radio.preset_hint")));
             addRenderableWidget(presetButtons[i]);
         }
@@ -80,7 +90,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
             b.setMessage(amFmLabel());
             playClick();
             sendUpdate();
-        }).bounds(x + 16, y + 164, btnW, 20).build();
+        }).bounds(x + 16, y + 172, btnW, 18).build();
         addRenderableWidget(amFmButton);
 
         powerButton = Button.builder(powerLabel(), b -> {
@@ -88,8 +98,14 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
             b.setMessage(powerLabel());
             playClick();
             sendUpdate();
-        }).bounds(x + 16 + btnW + 8, y + 164, btnW, 20).build();
+        }).bounds(x + 16 + btnW + 8, y + 172, btnW, 18).build();
         addRenderableWidget(powerButton);
+    }
+
+    private void stepKey(int dir) {
+        channelKey = ChannelKeys.clamp(channelKey + dir);
+        playClick();
+        sendUpdate();
     }
 
     @Override
@@ -187,7 +203,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
     }
 
     private void sendUpdate() {
-        PacketDistributor.sendToServer(new UpdateTransmitterPayload(blockPos, frequency, isAM, active));
+        PacketDistributor.sendToServer(new UpdateTransmitterPayload(blockPos, frequency, isAM, active, channelKey));
     }
 
     @Override
@@ -211,6 +227,7 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
             }
         }
         active = menu.isActive();
+        channelKey = menu.getChannelKey();
         if (powerButton != null) {
             powerButton.setMessage(powerLabel());
         }
@@ -234,11 +251,10 @@ public class RadioTransmitterScreen extends AbstractRadioScreen<RadioTransmitter
         RadioWidgets.drawRangeBar(graphics, font, leftPos + 16, topPos + 104, imageWidth - 32,
                 range, maxVisual, rangeLabel);
 
-        graphics.drawString(font,
-                Component.translatable("gui.real_radio.range_hint").getString(),
-                leftPos + 16, topPos + 124, RadioWidgets.COL_AMBER_DIM, false);
+        String keyLabel = Component.translatable("gui.real_radio.channel_key", ChannelKeys.format(channelKey)).getString();
+        graphics.drawString(font, keyLabel, leftPos + 36, topPos + 136, RadioWidgets.COL_AMBER_LIT, false);
 
-        RadioWidgets.drawMicMeter(graphics, font, leftPos + 16, topPos + 190, imageWidth - 32,
+        RadioWidgets.drawMicMeter(graphics, font, leftPos + 16, topPos + 194, imageWidth - 32,
                 menu.isSpeaking(), active);
     }
 }

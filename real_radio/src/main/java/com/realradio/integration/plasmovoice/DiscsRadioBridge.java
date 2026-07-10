@@ -2,9 +2,8 @@ package com.realradio.integration.plasmovoice;
 
 import com.realradio.RealRadio;
 import com.realradio.common.blockentity.RadioManager;
-import com.realradio.common.blockentity.RadioReceiverBlockEntity;
 import com.realradio.common.blockentity.RadioTransmitterBlockEntity;
-import com.realradio.common.util.SignalQuality;
+import com.realradio.common.util.RadioBroadcast;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 import su.plo.slib.api.server.position.ServerPos3d;
@@ -75,7 +74,7 @@ public final class DiscsRadioBridge {
             }
 
             tx.markSpeaking();
-            relayFromTransmitter(tx, data, sequence, stereo);
+            RadioBroadcast.fromTransmitter(tx, data, sequence, RECEIVER_HEAR_DISTANCE, stereo);
         }
     }
 
@@ -154,42 +153,6 @@ public final class DiscsRadioBridge {
         }
         // Discs defaults to stereo static sources unless mono_sources is enabled
         return true;
-    }
-
-    private static void relayFromTransmitter(
-            RadioTransmitterBlockEntity tx,
-            byte[] data,
-            long sequence,
-            boolean stereo
-    ) {
-        for (RadioReceiverBlockEntity rx : RadioManager.receivers()) {
-            if (!rx.isActive() || rx.getLevel() != tx.getLevel() || rx.isAM() != tx.isAM()) {
-                continue;
-            }
-            if (!rx.isDominantTransmitter(tx)) {
-                continue;
-            }
-            float quality = rx.rawQualityFrom(tx);
-            if (quality <= 0.0f || SignalQuality.isSquelched(rx.getSignalQuality())) {
-                continue;
-            }
-
-            var voiceSource = RadioVoiceService.getSource(rx);
-            if (voiceSource == null) {
-                voiceSource = RadioVoiceService.createSource(rx);
-            }
-            if (voiceSource == null) {
-                continue;
-            }
-
-            try {
-                // Match discs stereo/PCM layout so clients decode frames correctly.
-                voiceSource.setStereo(stereo);
-            } catch (Throwable ignored) {
-            }
-
-            voiceSource.sendAudioFrame(data, sequence, RECEIVER_HEAR_DISTANCE);
-        }
     }
 
     private record CapturePoint(ServerLevel level, Vec3 pos) {

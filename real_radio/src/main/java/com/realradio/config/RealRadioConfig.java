@@ -22,9 +22,18 @@ public final class RealRadioConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_LINE_OF_SIGHT;
     public static final ModConfigSpec.IntValue LOS_SAMPLE_STEP;
     public static final ModConfigSpec.DoubleValue LOS_MAX_PENALTY;
+    public static final ModConfigSpec.IntValue LOS_CACHE_GRID;
+    public static final ModConfigSpec.IntValue LOS_CACHE_TTL_MS;
+    public static final ModConfigSpec.IntValue LOS_CACHE_MAX;
 
     public static final ModConfigSpec.DoubleValue FM_RAIN_FACTOR;
     public static final ModConfigSpec.DoubleValue FM_THUNDER_FACTOR;
+
+    public static final ModConfigSpec.BooleanValue REQUIRE_MATCHING_KEY;
+    public static final ModConfigSpec.IntValue MAX_RELAY_HOPS;
+    public static final ModConfigSpec.BooleanValue ENABLE_COVERAGE_OVERLAY;
+    public static final ModConfigSpec.IntValue MAX_RECORDING_SECONDS;
+    public static final ModConfigSpec.DoubleValue HANDHELD_RANGE_FACTOR;
 
     static {
         // --- gameplay (toggle modes here) ---
@@ -106,6 +115,21 @@ public final class RealRadioConfig {
                 .comment("Max quality fraction lost to full obstruction (0–1).")
                 .defineInRange("losMaxPenalty", 0.85, 0.0, 1.0);
 
+        LOS_CACHE_GRID = BUILDER
+                .comment(
+                        "Quantize LOS endpoints to this grid (blocks) for multi-chunk cache hits.",
+                        "Higher = cheaper, coarser. 1 = exact BlockPos keys."
+                )
+                .defineInRange("losCacheGrid", 8, 1, 32);
+
+        LOS_CACHE_TTL_MS = BUILDER
+                .comment("How long a LOS cache entry stays valid (ms).")
+                .defineInRange("losCacheTtlMs", 1500, 200, 30_000);
+
+        LOS_CACHE_MAX = BUILDER
+                .comment("Max LOS cache entries before expired/half eviction.")
+                .defineInRange("losCacheMax", 4096, 256, 65_536);
+
         FM_RAIN_FACTOR = BUILDER
                 .comment("FM quality multiplier while raining.")
                 .defineInRange("fmRainFactor", 0.85, 0.2, 1.0);
@@ -113,6 +137,36 @@ public final class RealRadioConfig {
         FM_THUNDER_FACTOR = BUILDER
                 .comment("FM quality multiplier during thunderstorm.")
                 .defineInRange("fmThunderFactor", 0.70, 0.1, 1.0);
+
+        BUILDER.pop();
+
+        BUILDER.comment("Real Radio — channel key / relay / extras (v1.2)").push("features");
+
+        REQUIRE_MATCHING_KEY = BUILDER
+                .comment(
+                        "When true, TX and RX channelKey must match (0 = open channel).",
+                        "Mismatched keys produce no voice path."
+                )
+                .define("requireMatchingKey", true);
+
+        MAX_RELAY_HOPS = BUILDER
+                .comment("Max relay retransmissions per audio frame (anti-loop).")
+                .defineInRange("maxRelayHops", 3, 0, 16);
+
+        ENABLE_COVERAGE_OVERLAY = BUILDER
+                .comment(
+                        "Allow creative/debug coverage map overlay (client).",
+                        "Still disabled while realismMode is true unless player is creative."
+                )
+                .define("enableCoverageOverlay", true);
+
+        MAX_RECORDING_SECONDS = BUILDER
+                .comment("Max seconds of air to buffer into a radio tape.")
+                .defineInRange("maxRecordingSeconds", 45, 5, 180);
+
+        HANDHELD_RANGE_FACTOR = BUILDER
+                .comment("Handheld radio TX range as fraction of block TX range.")
+                .defineInRange("handheldRangeFactor", 0.35, 0.05, 1.0);
 
         BUILDER.pop();
         SPEC = BUILDER.build();
@@ -223,6 +277,70 @@ public final class RealRadioConfig {
             return FM_THUNDER_FACTOR.get().floatValue();
         } catch (Exception e) {
             return 0.70f;
+        }
+    }
+
+    public static int losCacheGrid() {
+        try {
+            return LOS_CACHE_GRID.get();
+        } catch (Exception e) {
+            return 8;
+        }
+    }
+
+    public static long losCacheTtlMs() {
+        try {
+            return LOS_CACHE_TTL_MS.get().longValue();
+        } catch (Exception e) {
+            return 1500L;
+        }
+    }
+
+    public static int losCacheMax() {
+        try {
+            return LOS_CACHE_MAX.get();
+        } catch (Exception e) {
+            return 4096;
+        }
+    }
+
+    public static boolean requireMatchingKey() {
+        try {
+            return REQUIRE_MATCHING_KEY.get();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    public static int maxRelayHops() {
+        try {
+            return MAX_RELAY_HOPS.get();
+        } catch (Exception e) {
+            return 3;
+        }
+    }
+
+    public static boolean enableCoverageOverlay() {
+        try {
+            return ENABLE_COVERAGE_OVERLAY.get();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
+    public static int maxRecordingSeconds() {
+        try {
+            return MAX_RECORDING_SECONDS.get();
+        } catch (Exception e) {
+            return 45;
+        }
+    }
+
+    public static float handheldRangeFactor() {
+        try {
+            return HANDHELD_RANGE_FACTOR.get().floatValue();
+        } catch (Exception e) {
+            return 0.35f;
         }
     }
 }

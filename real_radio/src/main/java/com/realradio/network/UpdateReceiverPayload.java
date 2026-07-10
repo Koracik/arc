@@ -2,6 +2,7 @@ package com.realradio.network;
 
 import com.realradio.RealRadio;
 import com.realradio.common.blockentity.RadioReceiverBlockEntity;
+import com.realradio.common.util.ChannelKeys;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -16,7 +17,8 @@ public record UpdateReceiverPayload(
         float frequency,
         boolean isAM,
         float volume,
-        boolean active
+        boolean active,
+        int channelKey
 ) implements CustomPacketPayload {
     public static final Type<UpdateReceiverPayload> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(RealRadio.MOD_ID, "update_receiver"));
@@ -28,6 +30,7 @@ public record UpdateReceiverPayload(
                     ByteBufCodecs.BOOL, UpdateReceiverPayload::isAM,
                     ByteBufCodecs.FLOAT, UpdateReceiverPayload::volume,
                     ByteBufCodecs.BOOL, UpdateReceiverPayload::active,
+                    ByteBufCodecs.VAR_INT, UpdateReceiverPayload::channelKey,
                     UpdateReceiverPayload::new
             );
 
@@ -45,7 +48,8 @@ public record UpdateReceiverPayload(
                 if (player.distanceToSqr(payload.pos.getX() + 0.5, payload.pos.getY() + 0.5, payload.pos.getZ() + 0.5) > 64.0) {
                     return;
                 }
-                be.applySettings(payload.frequency, payload.isAM, payload.volume, payload.active);
+                be.applySettings(payload.frequency, payload.isAM, payload.volume, payload.active,
+                        ChannelKeys.clamp(payload.channelKey));
             }
         });
     }
