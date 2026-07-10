@@ -325,7 +325,8 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
             }
             float los = RadioPropagation.lineOfSightFactor(level, tx.getBlockPos(), self, isAM);
             float weather = RadioPropagation.weatherFactor(level, isAM);
-            float strength = SignalQuality.finalQuality(distance * los * weather, perfectTuning);
+            float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
+            float strength = SignalQuality.finalQuality(distance * los * weather * rxAntenna, perfectTuning);
             if (strength > 0.02f) {
                 out.add(new NearbyStationsPayload.StationMarker(tx.getFrequency(), strength));
             }
