@@ -12,7 +12,18 @@
 [range]
 	baseRangeBlocks = 2500
 	amNightMultiplier = 1.3
+	# Soft bonus from high Y placement of the radio block itself
 	antennaHeightBonus = 1.35
+	# Copper lightning rods (minecraft:lightning_rod) above the radio = antenna mast
+	# Each rod boosts TX/relay range; more rods = stronger signal (capped by antennaMaxRods)
+	antennaRodBonusPerRod = 0.08
+	# RX quality boost per rod on the receiver mast
+	antennaRxBonusPerRod = 0.04
+	antennaMaxRods = 16
+	# Scan this many blocks UP from the radio
+	antennaScanHeight = 24
+	# Horizontal radius (1 = 3×3 column above the radio)
+	antennaScanRadius = 1
 
 [audio]
 	squelchThreshold = 0.08

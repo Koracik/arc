@@ -189,7 +189,8 @@ public final class RadioBroadcast {
         }
         float los = RadioPropagation.lineOfSightFactor(level, sourcePos, rx.getBlockPos(), isAM);
         float weather = RadioPropagation.weatherFactor(level, isAM);
-        return SignalQuality.finalQuality(distance * los * weather, tuning);
+        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, rx.getBlockPos());
+        return SignalQuality.finalQuality(distance * los * weather * rxAntenna, tuning);
     }
 
     private static boolean isDominantForReceiver(

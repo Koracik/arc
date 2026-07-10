@@ -82,6 +82,7 @@ com.realradio
 ## Notes
 
 - Blocks are **self-powered** (no FE/RF).
+- **Antenna:** stack **copper lightning rods** (`minecraft:lightning_rod`) above the TX/RX/relay (3×3 column by default). Each rod boosts TX range / RX quality; more rods = stronger signal (config: `antennaRodBonusPerRod`, `antennaMaxRods`). Placement height still gives a soft bonus.
 - Server Plasmo addon id: `real_radio` (source line: `radio_line`).
 - Voice loudness is scaled on the **client** via Plasmo Voice `AlSource` (server API has no `setVolume` on static sources).
 - Place a looping OGG at `assets/real_radio/sounds/radio_static.ogg` if you want custom noise (a generated placeholder is included).

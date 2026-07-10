@@ -166,15 +166,25 @@ public class RadioTransmitterBlockEntity extends BlockEntity implements MenuProv
     }
 
     /**
-     * Effective broadcast range: band × frequency × night (AM) × antenna height.
+     * Effective broadcast range: band × frequency × night (AM) × height × copper lightning-rod mast.
      */
     public int getRange() {
         int base = getBand().rangeBlocks(frequency);
-        float mult = RadioPropagation.antennaRangeMultiplier(getBlockPos().getY());
+        float mult = level != null
+                ? RadioPropagation.fullAntennaMultiplier(level, getBlockPos())
+                : RadioPropagation.antennaRangeMultiplier(getBlockPos().getY());
         if (isAM && level != null && level.isNight()) {
             mult *= RealRadioConfig.amNightMultiplier();
         }
         return Math.max(1, Math.round(base * mult));
+    }
+
+    /** Copper lightning rods counted as the antenna mast above this transmitter. */
+    public int getAntennaRodCount() {
+        if (level == null) {
+            return 0;
+        }
+        return RadioPropagation.countAntennaRods(level, getBlockPos());
     }
 
     public boolean isActive() {

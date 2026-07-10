@@ -60,6 +60,7 @@
 | 6 | ~~FE/RF power~~ | **out of scope** (blocks stay self-powered) |
 | 7 | **Air recording** — REC on RX → `radio_tape` playback | done |
 | 8 | **Handheld radio** — item + PTT hotkey (`V`) | done |
+| 9 | **Copper lightning-rod antenna mast** — rods above radio boost range/quality | done |
 
 Конфиг (`config/real_radio-common.toml`):
 - `[gameplay]` **`realismMode`**

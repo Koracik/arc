@@ -28,6 +28,8 @@
   "gui.real_radio.realism_hint": "Tune by ear — no station assist",
   "gui.real_radio.channel_key": "Key: %s",
   "gui.real_radio.channel_key_hint": "Matching key required for closed channel (0 = open)",
+  "gui.real_radio.antenna_rods": "Antenna: %s rods (+%s%%)",
+  "gui.real_radio.antenna_hint": "Stack copper lightning rods above the radio to boost signal",
   "gui.real_radio.record": "REC",
   "gui.real_radio.record_on": "REC ●",
   "gui.real_radio.in_freq": "IN",

@@ -162,11 +162,20 @@ public class RadioRelayBlockEntity extends BlockEntity implements MenuProvider {
 
     public int getOutRange() {
         int base = getOutBand().rangeBlocks(outFrequency);
-        float mult = RadioPropagation.antennaRangeMultiplier(getBlockPos().getY());
+        float mult = level != null
+                ? RadioPropagation.fullAntennaMultiplier(level, getBlockPos())
+                : RadioPropagation.antennaRangeMultiplier(getBlockPos().getY());
         if (outAM && level != null && level.isNight()) {
             mult *= RealRadioConfig.amNightMultiplier();
         }
         return Math.max(1, Math.round(base * mult));
+    }
+
+    public int getAntennaRodCount() {
+        if (level == null) {
+            return 0;
+        }
+        return RadioPropagation.countAntennaRods(level, getBlockPos());
     }
 
     public ContainerData getDataAccess() {

@@ -198,7 +198,8 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
         }
         float los = RadioPropagation.lineOfSightFactor(level, relay.getBlockPos(), self, isAM);
         float weather = RadioPropagation.weatherFactor(level, isAM);
-        return SignalQuality.finalQuality(distance * los * weather, tuning);
+        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
+        return SignalQuality.finalQuality(distance * los * weather * rxAntenna, tuning);
     }
 
     private float rawQualityFrom(RadioTransmitterBlockEntity tx, RadioBand band, BlockPos self) {
@@ -220,8 +221,16 @@ public class RadioReceiverBlockEntity extends BlockEntity implements MenuProvide
 
         float los = RadioPropagation.lineOfSightFactor(level, tx.getBlockPos(), self, isAM);
         float weather = RadioPropagation.weatherFactor(level, isAM);
-        float env = los * weather;
+        float rxAntenna = RadioPropagation.antennaReceiveMultiplier(level, self);
+        float env = los * weather * rxAntenna;
         return SignalQuality.finalQuality(distance * env, tuning);
+    }
+
+    public int getAntennaRodCount() {
+        if (level == null) {
+            return 0;
+        }
+        return RadioPropagation.countAntennaRods(level, getBlockPos());
     }
 
     public boolean isDominantTransmitter(RadioTransmitterBlockEntity tx) {

@@ -28,6 +28,8 @@
   "gui.real_radio.realism_hint": "Настраивай на слух — подсказок нет",
   "gui.real_radio.channel_key": "Ключ: %s",
   "gui.real_radio.channel_key_hint": "Одинаковый ключ для закрытого канала (0 = открытый)",
+  "gui.real_radio.antenna_rods": "Антенна: %s стерж. (+%s%%)",
+  "gui.real_radio.antenna_hint": "Ставь медные громоотводы над радио — больше стержней = сильнее сигнал",
   "gui.real_radio.record": "ЗАП",
   "gui.real_radio.record_on": "ЗАП ●",
   "gui.real_radio.in_freq": "ВХ",

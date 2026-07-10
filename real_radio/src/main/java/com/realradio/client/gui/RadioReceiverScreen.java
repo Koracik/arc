@@ -5,6 +5,7 @@ import com.realradio.common.menu.RadioReceiverMenu;
 import com.realradio.common.util.ChannelKeys;
 import com.realradio.common.util.ChannelPresets;
 import com.realradio.common.util.RadioBand;
+import com.realradio.common.util.RadioPropagation;
 import com.realradio.common.util.SignalQuality;
 import com.realradio.config.RealRadioConfig;
 import com.realradio.network.NearbyStationsPayload;
@@ -296,6 +297,16 @@ public class RadioReceiverScreen extends AbstractRadioScreen<RadioReceiverMenu> 
         String main = band().format(frequency);
         String side = isAM ? "AM" : "FM";
         RadioWidgets.drawLcd(graphics, font, leftPos + 16, topPos + 30, imageWidth - 32, 28, main, side, active);
+
+        int rods = 0;
+        if (minecraft != null && minecraft.level != null) {
+            rods = RadioPropagation.countAntennaRods(minecraft.level, blockPos);
+        }
+        float rodMult = 1.0f + rods * RealRadioConfig.antennaRxBonusPerRod();
+        String antennaLabel = Component.translatable(
+                "gui.real_radio.antenna_rods", rods, Math.round((rodMult - 1.0f) * 100)
+        ).getString();
+        graphics.drawString(font, antennaLabel, leftPos + 16, topPos + 124, RadioWidgets.COL_AMBER_DIM, false);
 
         String keyLabel = Component.translatable("gui.real_radio.channel_key", ChannelKeys.format(channelKey)).getString();
         graphics.drawString(font, keyLabel, leftPos + 36, topPos + 136, RadioWidgets.COL_AMBER_LIT, false);

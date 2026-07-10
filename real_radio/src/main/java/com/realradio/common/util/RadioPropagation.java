@@ -3,6 +3,8 @@ package com.realradio.common.util;
 import com.realradio.config.RealRadioConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LightningRodBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
@@ -12,18 +14,20 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Environmental propagation: line-of-sight, antenna height, weather.
+ * Environmental propagation: line-of-sight, copper lightning-rod antennas, weather.
  * LOS results are grid-quantized and TTL-cached for multi-chunk distances.
  */
 public final class RadioPropagation {
     private static final Map<Long, CacheEntry> LOS_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Long, RodCacheEntry> ROD_CACHE = new ConcurrentHashMap<>();
+    private static final long ROD_CACHE_TTL_MS = 500L;
 
     private RadioPropagation() {
     }
 
     /**
      * Multiplier for max TX range from placement height (sea-level-ish).
-     * Higher antenna → farther reach (both bands).
+     * Soft bonus; main gain comes from {@link #antennaRodMultiplier(Level, BlockPos)}.
      */
     public static float antennaRangeMultiplier(int blockY) {
         float maxBonus = RealRadioConfig.antennaHeightBonus();
@@ -37,6 +41,96 @@ public final class RadioPropagation {
             return 1.0f + t * 0.2f; // down to 0.9
         }
         return 1.0f + t * (maxBonus - 1.0f);
+    }
+
+    /**
+     * Copper lightning rods ({@link Blocks#LIGHTNING_ROD}) form the real antenna mast.
+     * Counted in a column (and small horizontal radius) above the radio block.
+     * More rods → stronger TX range / RX quality (see config).
+     */
+    public static boolean isAntennaRod(BlockState state) {
+        return state != null && (state.is(Blocks.LIGHTNING_ROD) || state.getBlock() instanceof LightningRodBlock);
+    }
+
+    /**
+     * Number of copper lightning rods forming the mast above {@code radioPos}.
+     */
+    public static int countAntennaRods(Level level, BlockPos radioPos) {
+        if (level == null || radioPos == null) {
+            return 0;
+        }
+        long key = radioPos.asLong() ^ (level.dimension().location().hashCode() * 31L);
+        long now = System.currentTimeMillis();
+        RodCacheEntry cached = ROD_CACHE.get(key);
+        if (cached != null && now - cached.timeMs < ROD_CACHE_TTL_MS) {
+            return cached.count;
+        }
+
+        int maxRods = RealRadioConfig.antennaMaxRods();
+        if (maxRods <= 0) {
+            ROD_CACHE.put(key, new RodCacheEntry(0, now));
+            return 0;
+        }
+        int maxH = Math.max(1, RealRadioConfig.antennaScanHeight());
+        int radius = Math.max(0, RealRadioConfig.antennaScanRadius());
+        int count = 0;
+
+        for (int dy = 1; dy <= maxH && count < maxRods; dy++) {
+            for (int dx = -radius; dx <= radius && count < maxRods; dx++) {
+                for (int dz = -radius; dz <= radius && count < maxRods; dz++) {
+                    BlockPos p = radioPos.offset(dx, dy, dz);
+                    if (!level.isLoaded(p)) {
+                        continue;
+                    }
+                    if (isAntennaRod(level.getBlockState(p))) {
+                        count++;
+                    }
+                }
+            }
+        }
+
+        if (ROD_CACHE.size() > 2048) {
+            ROD_CACHE.clear();
+        }
+        ROD_CACHE.put(key, new RodCacheEntry(count, now));
+        return count;
+    }
+
+    /**
+     * TX/relay range multiplier from copper lightning-rod mast (1.0 = no rods).
+     */
+    public static float antennaRodMultiplier(Level level, BlockPos radioPos) {
+        int rods = countAntennaRods(level, radioPos);
+        if (rods <= 0) {
+            return 1.0f;
+        }
+        float per = RealRadioConfig.antennaRodBonusPerRod();
+        return 1.0f + rods * per;
+    }
+
+    /**
+     * RX quality multiplier from copper lightning-rod mast on the receiver (1.0 = no rods).
+     * Capped so it stays reasonable even with a full mast.
+     */
+    public static float antennaReceiveMultiplier(Level level, BlockPos radioPos) {
+        int rods = countAntennaRods(level, radioPos);
+        if (rods <= 0) {
+            return 1.0f;
+        }
+        float per = RealRadioConfig.antennaRxBonusPerRod();
+        return Math.min(2.0f, 1.0f + rods * per);
+    }
+
+    /**
+     * Combined placement height × copper-rod mast multiplier for TX/relay range.
+     */
+    public static float fullAntennaMultiplier(Level level, BlockPos radioPos) {
+        float height = antennaRangeMultiplier(radioPos.getY());
+        float rods = antennaRodMultiplier(level, radioPos);
+        return height * rods;
+    }
+
+    private record RodCacheEntry(int count, long timeMs) {
     }
 
     /**

@@ -12,6 +12,11 @@ public final class RealRadioConfig {
     public static final ModConfigSpec.IntValue BASE_RANGE_BLOCKS;
     public static final ModConfigSpec.DoubleValue AM_NIGHT_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue ANTENNA_HEIGHT_BONUS;
+    public static final ModConfigSpec.DoubleValue ANTENNA_ROD_BONUS_PER_ROD;
+    public static final ModConfigSpec.DoubleValue ANTENNA_RX_BONUS_PER_ROD;
+    public static final ModConfigSpec.IntValue ANTENNA_MAX_RODS;
+    public static final ModConfigSpec.IntValue ANTENNA_SCAN_HEIGHT;
+    public static final ModConfigSpec.IntValue ANTENNA_SCAN_RADIUS;
 
     public static final ModConfigSpec.DoubleValue SQUELCH_THRESHOLD;
     public static final ModConfigSpec.DoubleValue STATIC_VOLUME_SCALE;
@@ -68,10 +73,37 @@ public final class RealRadioConfig {
 
         ANTENNA_HEIGHT_BONUS = BUILDER
                 .comment(
-                        "Max range multiplier for high antenna placement (Y≈160).",
-                        "1.0 = no height bonus. Default 1.35."
+                        "Soft max range multiplier for high radio placement (Y≈160).",
+                        "1.0 = no height bonus. Stacks with copper lightning-rod mast.",
+                        "Default 1.35."
                 )
                 .defineInRange("antennaHeightBonus", 1.35, 1.0, 2.5);
+
+        ANTENNA_ROD_BONUS_PER_ROD = BUILDER
+                .comment(
+                        "TX/relay range bonus per copper lightning rod in the mast above the radio.",
+                        "Example: 0.08 × 8 rods = +64% range. Default 0.08."
+                )
+                .defineInRange("antennaRodBonusPerRod", 0.08, 0.0, 0.5);
+
+        ANTENNA_RX_BONUS_PER_ROD = BUILDER
+                .comment(
+                        "Receiver quality multiplier bonus per lightning rod on the RX mast.",
+                        "Example: 0.04 × 5 rods ≈ +20% quality. Default 0.04."
+                )
+                .defineInRange("antennaRxBonusPerRod", 0.04, 0.0, 0.5);
+
+        ANTENNA_MAX_RODS = BUILDER
+                .comment("Max lightning rods counted for antenna bonus.")
+                .defineInRange("antennaMaxRods", 16, 0, 64);
+
+        ANTENNA_SCAN_HEIGHT = BUILDER
+                .comment("How many blocks above the radio to scan for lightning rods.")
+                .defineInRange("antennaScanHeight", 24, 1, 64);
+
+        ANTENNA_SCAN_RADIUS = BUILDER
+                .comment("Horizontal radius (blocks) around the radio for the mast (0 = only column above).")
+                .defineInRange("antennaScanRadius", 1, 0, 3);
 
         BUILDER.pop();
 
@@ -196,6 +228,46 @@ public final class RealRadioConfig {
             return ANTENNA_HEIGHT_BONUS.get().floatValue();
         } catch (Exception e) {
             return 1.35f;
+        }
+    }
+
+    public static float antennaRodBonusPerRod() {
+        try {
+            return ANTENNA_ROD_BONUS_PER_ROD.get().floatValue();
+        } catch (Exception e) {
+            return 0.08f;
+        }
+    }
+
+    public static float antennaRxBonusPerRod() {
+        try {
+            return ANTENNA_RX_BONUS_PER_ROD.get().floatValue();
+        } catch (Exception e) {
+            return 0.04f;
+        }
+    }
+
+    public static int antennaMaxRods() {
+        try {
+            return ANTENNA_MAX_RODS.get();
+        } catch (Exception e) {
+            return 16;
+        }
+    }
+
+    public static int antennaScanHeight() {
+        try {
+            return ANTENNA_SCAN_HEIGHT.get();
+        } catch (Exception e) {
+            return 24;
+        }
+    }
+
+    public static int antennaScanRadius() {
+        try {
+            return ANTENNA_SCAN_RADIUS.get();
+        } catch (Exception e) {
+            return 1;
         }
     }
 
